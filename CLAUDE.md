@@ -4,7 +4,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository Overview
 
-This is a personal home directory containing multiple web development projects under `~/Documents/Websites/`:
+This is a dotfiles repo for Collin Peterson's home directory, tracked at https://github.com/collinp2/dotfiles. It contains shell config, git config, and multiple web development projects under `~/Documents/Websites/`.
+
+## Dotfiles
+
+| File | Purpose |
+|------|---------|
+| `.zshrc` | Adds `~/.local/bin` and Homebrew (`/opt/homebrew`) to PATH |
+| `.zprofile` | Initializes Homebrew for login shells |
+| `.gitconfig` | Global git identity and settings |
+| `lifekey.pub` | Public SSH key |
+
+## Web Development Projects
+
+Projects live under `~/Documents/Websites/`:
 
 - **Life Path Site 2** — WordPress site hosted on Pantheon (PHP 7.4), git-based deployment
 - **Life Path TEST** — Test/staging WordPress installation
