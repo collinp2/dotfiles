@@ -56,3 +56,29 @@ lessc styles/mobile.less styles/mobile.css
 ```
 
 **Theme variables** (color, font, layout settings) are defined as LESS variables at the top of `global.less`.
+
+## Audio Plugins (JUCE/C++)
+
+Plugins live at `~/Documents/testing/`, cloned from https://github.com/collinp2/testing. Each plugin is on its own branch.
+
+| Plugin | Branch | Description |
+|--------|--------|-------------|
+| Flesh Render | `claude/horror-saturation-vst-bkHIK` | Multiband saturation/distortion/fuzz (VoidCraft Audio) |
+| GEQ-12 | `claude/add-aax-format-support-SDlej` | 12-band graphic EQ (AudioTools) |
+
+**Build system:** CMake + JUCE (auto-fetched via FetchContent). Requires `cmake` (install via Homebrew).
+
+**Build commands:**
+```bash
+cmake -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --config Release
+```
+
+**macOS 15 compatibility:** JUCE must use the `develop` branch (not a tagged release) due to removed APIs in macOS 15. Set `GIT_TAG develop` and `GIT_SHALLOW FALSE` in `CMakeLists.txt`.
+
+**Install VST3:**
+```bash
+cp -r "build/<Name>_artefacts/Release/VST3/<Name>.vst3" ~/Library/Audio/Plug-Ins/VST3/
+```
+
+**Installed plugins:** `~/Library/Audio/Plug-Ins/VST3/`
