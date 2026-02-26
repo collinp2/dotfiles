@@ -59,7 +59,7 @@ lessc styles/mobile.less styles/mobile.css
 
 ## Audio Plugins (JUCE/C++)
 
-Plugins live at `~/Documents/testing/`, cloned from https://github.com/collinp2/testing. Each plugin is on its own branch.
+Plugins live at `~/Documents/testing/`, cloned from https://github.com/collinp2/cp_software. Each plugin is on its own branch.
 
 | Plugin | Branch | Description |
 |--------|--------|-------------|
