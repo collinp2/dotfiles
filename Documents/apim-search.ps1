@@ -5,9 +5,16 @@
 .DESCRIPTION
     Auto-detects the APIM instance from your current Azure login. If multiple
     instances exist in the subscription, you will be prompted to choose one.
-    Scans every policy level — global, product, API, and operation — plus
-    operation URL templates. Outputs level, name, line number, and snippet
-    for every match.
+
+    Uses the APIM REST API directly so only policies explicitly defined at each
+    level are searched — inherited/effective policies are not duplicated across
+    every child operation.
+
+    Strips Azure's default comment block before searching so boilerplate
+    instructions don't generate false positives.
+
+    Each policy that matches produces one result row showing how many lines
+    matched and the first matching snippet.
 
 .PARAMETER SearchTerm
     The string to search for. Treated as a literal string (not regex).
@@ -61,7 +68,31 @@ if ($instances.Count -eq 1) {
     $apim = $instances[[int]$choice]
 }
 
-$ctx = New-AzApiManagementContext -ResourceGroupName $apim.ResourceGroupName -ServiceName $apim.Name
+$apimCtx = New-AzApiManagementContext -ResourceGroupName $apim.ResourceGroupName -ServiceName $apim.Name
+
+# ── REST API helper ───────────────────────────────────────────────────────────
+# Uses Invoke-AzRestMethod so a 404 means "no policy defined at this level"
+# rather than returning an inherited/effective policy.
+
+$subId    = $azCtx.Subscription.Id
+$basePath = "/subscriptions/$subId/resourceGroups/$($apim.ResourceGroupName)" +
+            "/providers/Microsoft.ApiManagement/service/$($apim.Name)"
+$apiVer   = "api-version=2022-08-01"
+
+function Get-PolicyXml([string]$ResourcePath) {
+    $response = Invoke-AzRestMethod -Method GET `
+        -Path "$basePath$ResourcePath/policies/policy?$apiVer&format=rawxml"
+    if ($response.StatusCode -eq 200) {
+        $xml = ($response.Content | ConvertFrom-Json).properties.value
+        # Strip the Azure boilerplate comment block (<!-- ... -->) that appears
+        # at the top of every policy — it contains common words that cause
+        # false positives and is never user-authored content.
+        $xml = [regex]::Replace($xml, '<!--.*?-->', '', `
+            [System.Text.RegularExpressions.RegexOptions]::Singleline)
+        return $xml
+    }
+    return $null  # 404 = no policy defined at this level
+}
 
 # ── Setup ─────────────────────────────────────────────────────────────────────
 
@@ -73,21 +104,24 @@ $rxOptions = if ($CaseSensitive) {
 }
 $escaped = [regex]::Escape($SearchTerm)
 
-# ── Helper ────────────────────────────────────────────────────────────────────
-
 function Find-InPolicy {
     param([string]$Xml, [string]$Level, [string]$Name)
     if (-not $Xml) { return }
-    $lines = $Xml -split "`n"
+    $lines        = $Xml -split "`n"
+    $matchedLines = @()
     for ($i = 0; $i -lt $lines.Count; $i++) {
         if ([regex]::IsMatch($lines[$i], $escaped, $rxOptions)) {
-            $script:results.Add([PSCustomObject]@{
-                Level   = $Level
-                Name    = $Name
-                Line    = $i + 1
-                Snippet = $lines[$i].Trim()
-            })
+            $matchedLines += [PSCustomObject]@{ Line = $i + 1; Text = $lines[$i].Trim() }
         }
+    }
+    if ($matchedLines.Count -gt 0) {
+        $script:results.Add([PSCustomObject]@{
+            Level   = $Level
+            Name    = $Name
+            Matches = $matchedLines.Count
+            Line    = $matchedLines[0].Line
+            Snippet = $matchedLines[0].Text
+        })
     }
 }
 
@@ -95,44 +129,42 @@ function Find-InPolicy {
 
 # Global policy
 Write-Host "Checking global policy..." -ForegroundColor Cyan
-try { Find-InPolicy (Get-AzApiManagementPolicy -Context $ctx) "Global" "Global" }
-catch { Write-Warning "Could not read global policy: $_" }
+Find-InPolicy (Get-PolicyXml "") "Global" "Global"
 
 # Product policies
 Write-Host "Checking product policies..." -ForegroundColor Cyan
-Get-AzApiManagementProduct -Context $ctx | ForEach-Object {
-    try { Find-InPolicy (Get-AzApiManagementPolicy -Context $ctx -ProductId $_.ProductId) "Product" $_.Title }
-    catch {}
+Get-AzApiManagementProduct -Context $apimCtx | ForEach-Object {
+    Find-InPolicy (Get-PolicyXml "/products/$($_.ProductId)") "Product" $_.Title
 }
 
-# APIs + operations
+# APIs + operations (skip non-current revisions — Get-AzApiManagementApi returns
+# every revision; ;rev= in the ApiId indicates a non-current revision copy)
 Write-Host "Checking API and operation policies..." -ForegroundColor Cyan
-Get-AzApiManagementApi -Context $ctx | ForEach-Object {
+Get-AzApiManagementApi -Context $apimCtx | Where-Object { $_.ApiId -notmatch ';rev=' } | ForEach-Object {
     $api = $_
     Write-Host "  $($api.Name)" -ForegroundColor Gray
 
     # API-level policy
-    try { Find-InPolicy (Get-AzApiManagementPolicy -Context $ctx -ApiId $api.ApiId) "API Policy" $api.Name }
-    catch {}
+    Find-InPolicy (Get-PolicyXml "/apis/$($api.ApiId)") "API Policy" $api.Name
 
     # Operations
-    Get-AzApiManagementOperation -Context $ctx -ApiId $api.ApiId | ForEach-Object {
+    Get-AzApiManagementOperation -Context $apimCtx -ApiId $api.ApiId | ForEach-Object {
         $op = $_
-        $label = "$($api.Name)  ›  $($op.Name)  [$($op.Method) $($op.UrlTemplate)]"
 
         # URL template
         if ([regex]::IsMatch($op.UrlTemplate, $escaped, $rxOptions)) {
             $script:results.Add([PSCustomObject]@{
                 Level   = "Operation URL"
                 Name    = "$($api.Name)  ›  $($op.Name)"
+                Matches = 1
                 Line    = "-"
                 Snippet = "$($op.Method) $($op.UrlTemplate)"
             })
         }
 
-        # Operation policy
-        try { Find-InPolicy (Get-AzApiManagementPolicy -Context $ctx -ApiId $api.ApiId -OperationId $op.OperationId) "Operation Policy" $label }
-        catch {}
+        # Operation policy (only if explicitly defined at this level)
+        $label = "$($api.Name)  ›  $($op.Name)"
+        Find-InPolicy (Get-PolicyXml "/apis/$($api.ApiId)/operations/$($op.OperationId)") "Operation Policy" $label
     }
 }
 
@@ -144,5 +176,5 @@ if ($results.Count -eq 0) {
 } else {
     Write-Host "Found $($results.Count) match(es) for '$SearchTerm':" -ForegroundColor Green
     Write-Host ""
-    $results | Format-Table Level, Name, Line, Snippet -AutoSize -Wrap
+    $results | Format-Table Level, Name, Matches, Line, Snippet -AutoSize -Wrap
 }
