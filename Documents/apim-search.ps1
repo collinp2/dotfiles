@@ -31,6 +31,9 @@ param(
     [switch]$CaseSensitive
 )
 
+# ── Debug ─────────────────────────────────────────────────────────────────────
+Write-Host "Searching for: '$SearchTerm'" -ForegroundColor Magenta
+
 # ── Verify Azure login ────────────────────────────────────────────────────────
 
 $azCtx = Get-AzContext
