@@ -3,52 +3,68 @@
     Search all Azure APIM policies and settings for a specific term.
 
 .DESCRIPTION
-    Scans every policy level in an APIM instance — global, product, API, and
-    operation — plus operation URL templates. Outputs matching line numbers
-    and snippets so you can locate the term immediately.
+    Auto-detects the APIM instance from your current Azure login. If multiple
+    instances exist in the subscription, you will be prompted to choose one.
+    Scans every policy level — global, product, API, and operation — plus
+    operation URL templates. Outputs level, name, line number, and snippet
+    for every match.
 
 .PARAMETER SearchTerm
     The string to search for. Treated as a literal string (not regex).
-
-.PARAMETER ResourceGroup
-    Azure resource group containing the APIM instance.
-
-.PARAMETER ServiceName
-    APIM service name.
 
 .PARAMETER CaseSensitive
     By default the search is case-insensitive. Use this switch to make it exact.
 
 .EXAMPLE
-    ./apim-search.ps1 -SearchTerm "rewrite-uri" -ResourceGroup "myRG" -ServiceName "myAPIM"
+    ./apim-search.ps1 -SearchTerm "rewrite-uri"
 
 .EXAMPLE
-    ./apim-search.ps1 -SearchTerm "api.example.com" -ResourceGroup "myRG" -ServiceName "myAPIM" -CaseSensitive
+    ./apim-search.ps1 -SearchTerm "api.example.com" -CaseSensitive
 #>
 
 param(
     [Parameter(Mandatory, HelpMessage = "String to search for")]
     [string]$SearchTerm,
 
-    [Parameter(Mandatory, HelpMessage = "Azure resource group name")]
-    [string]$ResourceGroup,
-
-    [Parameter(Mandatory, HelpMessage = "APIM service name")]
-    [string]$ServiceName,
-
     [switch]$CaseSensitive
 )
 
-# ── Prerequisites ─────────────────────────────────────────────────────────────
+# ── Verify Azure login ────────────────────────────────────────────────────────
 
-if (-not (Get-Module -ListAvailable -Name Az.ApiManagement)) {
-    Write-Error "Az.ApiManagement module not found. Run: Install-Module Az -Scope CurrentUser"
+$azCtx = Get-AzContext
+if (-not $azCtx) {
+    Write-Error "Not logged in to Azure. Run 'Connect-AzAccount' first."
+    exit 1
+}
+Write-Host "Subscription: $($azCtx.Subscription.Name)" -ForegroundColor DarkGray
+
+# ── Find APIM instance ────────────────────────────────────────────────────────
+
+Write-Host "Discovering APIM instances..." -ForegroundColor Cyan
+$instances = Get-AzApiManagement
+
+if (-not $instances) {
+    Write-Error "No APIM instances found in subscription '$($azCtx.Subscription.Name)'."
     exit 1
 }
 
+if ($instances.Count -eq 1) {
+    $apim = $instances[0]
+    Write-Host "Using: $($apim.Name)  ($($apim.ResourceGroupName))" -ForegroundColor DarkGray
+} else {
+    Write-Host ""
+    Write-Host "Multiple APIM instances found:" -ForegroundColor Yellow
+    for ($i = 0; $i -lt $instances.Count; $i++) {
+        Write-Host "  [$i] $($instances[$i].Name)  ($($instances[$i].ResourceGroupName))"
+    }
+    $choice = Read-Host "Enter number"
+    $apim = $instances[[int]$choice]
+}
+
+$ctx = New-AzApiManagementContext -ResourceGroupName $apim.ResourceGroupName -ServiceName $apim.Name
+
 # ── Setup ─────────────────────────────────────────────────────────────────────
 
-$ctx = New-AzApiManagementContext -ResourceGroupName $ResourceGroup -ServiceName $ServiceName
 $results = [System.Collections.Generic.List[PSCustomObject]]::new()
 $rxOptions = if ($CaseSensitive) {
     [System.Text.RegularExpressions.RegexOptions]::None
