@@ -22,18 +22,27 @@
 .PARAMETER CaseSensitive
     By default the search is case-insensitive. Use this switch to make it exact.
 
+.PARAMETER SearchUrls
+    Also search operation URL templates. Off by default — when the search term
+    matches the API's own base path it produces one hit per operation, flooding
+    results. Enable only when you specifically need to find URL references.
+
 .EXAMPLE
-    ./apim-search.ps1 -SearchTerm "rewrite-uri"
+    ./apim-search.ps1 -SearchTerm "admissions-decision-processing"
 
 .EXAMPLE
     ./apim-search.ps1 -SearchTerm "api.example.com" -CaseSensitive
+
+.EXAMPLE
+    ./apim-search.ps1 -SearchTerm "/legacy/path" -SearchUrls
 #>
 
 param(
-    [Parameter(Mandatory, HelpMessage = "String to search for")]
-    [string]$SearchTerm,
+    [Parameter(HelpMessage = "String to search for")]
+    [string]$SearchTerm = "admissions-decision-processing",
 
-    [switch]$CaseSensitive
+    [switch]$CaseSensitive,
+    [switch]$SearchUrls
 )
 
 # ── Verify Azure login ────────────────────────────────────────────────────────
@@ -84,9 +93,8 @@ function Get-PolicyXml([string]$ResourcePath) {
         -Path "$basePath$ResourcePath/policies/policy?$apiVer&format=rawxml"
     if ($response.StatusCode -eq 200) {
         $xml = ($response.Content | ConvertFrom-Json).properties.value
-        # Strip the Azure boilerplate comment block (<!-- ... -->) that appears
-        # at the top of every policy — it contains common words that cause
-        # false positives and is never user-authored content.
+        # Strip Azure's boilerplate comment block (<!-- ... -->) — it contains
+        # common words that cause false positives and is never user-authored.
         $xml = [regex]::Replace($xml, '<!--.*?-->', '', `
             [System.Text.RegularExpressions.RegexOptions]::Singleline)
         return $xml
@@ -149,13 +157,15 @@ Get-AzApiManagementApi -Context $apimCtx | Where-Object { $_.ApiId -notmatch ';r
 
     # Operations
     Get-AzApiManagementOperation -Context $apimCtx -ApiId $api.ApiId | ForEach-Object {
-        $op = $_
+        $op    = $_
+        $label = "$($api.Name)  ›  $($op.Name)"
 
-        # URL template
-        if ([regex]::IsMatch($op.UrlTemplate, $escaped, $rxOptions)) {
+        # URL template (opt-in only — searching by term often matches every
+        # operation in an API that uses the term as its base path)
+        if ($SearchUrls -and [regex]::IsMatch($op.UrlTemplate, $escaped, $rxOptions)) {
             $script:results.Add([PSCustomObject]@{
                 Level   = "Operation URL"
-                Name    = "$($api.Name)  ›  $($op.Name)"
+                Name    = $label
                 Matches = 1
                 Line    = "-"
                 Snippet = "$($op.Method) $($op.UrlTemplate)"
@@ -163,7 +173,6 @@ Get-AzApiManagementApi -Context $apimCtx | Where-Object { $_.ApiId -notmatch ';r
         }
 
         # Operation policy (only if explicitly defined at this level)
-        $label = "$($api.Name)  ›  $($op.Name)"
         Find-InPolicy (Get-PolicyXml "/apis/$($api.ApiId)/operations/$($op.OperationId)") "Operation Policy" $label
     }
 }
