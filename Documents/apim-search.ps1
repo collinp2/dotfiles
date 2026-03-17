@@ -1,20 +1,15 @@
 <#
 .SYNOPSIS
-    Search all Azure APIM policies and settings for a specific term.
+    Search Azure APIM global, product, and API-level policies for a specific term.
 
 .DESCRIPTION
     Auto-detects the APIM instance from your current Azure login. If multiple
     instances exist in the subscription, you will be prompted to choose one.
 
-    Uses the APIM REST API directly so only policies explicitly defined at each
-    level are searched — inherited/effective policies are not duplicated across
-    every child operation.
-
-    Strips Azure's default comment block before searching so boilerplate
-    instructions don't generate false positives.
-
-    Each policy that matches produces one result row showing how many lines
-    matched and the first matching snippet.
+    Searches: global policy, product policies, and API-level policies.
+    Operation-level policy search is excluded — the APIM REST API returns
+    effective/inherited content at the operation level regardless of format,
+    making operation results unreliable.
 
 .PARAMETER SearchTerm
     The string to search for. Treated as a literal string (not regex).
@@ -22,27 +17,18 @@
 .PARAMETER CaseSensitive
     By default the search is case-insensitive. Use this switch to make it exact.
 
-.PARAMETER SearchUrls
-    Also search operation URL templates. Off by default — when the search term
-    matches the API's own base path it produces one hit per operation, flooding
-    results. Enable only when you specifically need to find URL references.
-
 .EXAMPLE
     ./apim-search.ps1 -SearchTerm "admissions-decision-processing"
 
 .EXAMPLE
     ./apim-search.ps1 -SearchTerm "api.example.com" -CaseSensitive
-
-.EXAMPLE
-    ./apim-search.ps1 -SearchTerm "/legacy/path" -SearchUrls
 #>
 
 param(
     [Parameter(HelpMessage = "String to search for")]
     [string]$SearchTerm = "admissions-decision-processing",
 
-    [switch]$CaseSensitive,
-    [switch]$SearchUrls
+    [switch]$CaseSensitive
 )
 
 # ── Verify Azure login ────────────────────────────────────────────────────────
@@ -80,8 +66,6 @@ if ($instances.Count -eq 1) {
 $apimCtx = New-AzApiManagementContext -ResourceGroupName $apim.ResourceGroupName -ServiceName $apim.Name
 
 # ── REST API helper ───────────────────────────────────────────────────────────
-# Uses Invoke-AzRestMethod so a 404 means "no policy defined at this level"
-# rather than returning an inherited/effective policy.
 
 $subId    = $azCtx.Subscription.Id
 $basePath = "/subscriptions/$subId/resourceGroups/$($apim.ResourceGroupName)" +
@@ -89,25 +73,13 @@ $basePath = "/subscriptions/$subId/resourceGroups/$($apim.ResourceGroupName)" +
 $apiVer   = "api-version=2022-08-01"
 
 function Get-PolicyXml([string]$ResourcePath) {
-    # Step 1: LIST endpoint — returns an empty array when no custom policy is
-    # explicitly defined at this level. This is the only reliable way to
-    # distinguish "has a custom policy" from "inherits parent policy", since
-    # the single-resource GET returns the effective/inherited policy either way.
-    $listResp = Invoke-AzRestMethod -Method GET `
-        -Path "$basePath$ResourcePath/policies?$apiVer"
-    if ($listResp.StatusCode -ne 200) { return $null }
-    $policyList = ($listResp.Content | ConvertFrom-Json).value
-    if (-not $policyList -or $policyList.Count -eq 0) { return $null }
-
-    # Step 2: Fetch the actual policy XML (custom policy confirmed to exist)
     $response = Invoke-AzRestMethod -Method GET `
         -Path "$basePath$ResourcePath/policies/policy?$apiVer"
     if ($response.StatusCode -ne 200) { return $null }
 
     $xml = ($response.Content | ConvertFrom-Json).properties.value
 
-    # Strip Azure's boilerplate comment block (<!-- ... -->) — it contains
-    # common words that cause false positives and is never user-authored.
+    # Strip Azure's boilerplate comment block — never user-authored content.
     $xml = [regex]::Replace($xml, '<!--.*?-->', '', `
         [System.Text.RegularExpressions.RegexOptions]::Singleline)
 
@@ -157,37 +129,22 @@ Get-AzApiManagementProduct -Context $apimCtx | ForEach-Object {
     Find-InPolicy (Get-PolicyXml "/products/$($_.ProductId)") "Product" $_.Title
 }
 
-# APIs + operations (skip non-current revisions — Get-AzApiManagementApi returns
-# every revision; ;rev= in the ApiId indicates a non-current revision copy)
-Write-Host "Checking API and operation policies..." -ForegroundColor Cyan
-Get-AzApiManagementApi -Context $apimCtx | Where-Object { $_.ApiId -notmatch ';rev=' } | ForEach-Object {
+# API-level policies (skip non-current revisions)
+Write-Host "Checking API policies..." -ForegroundColor Cyan
+$apis = Get-AzApiManagementApi -Context $apimCtx | Where-Object { $_.ApiId -notmatch ';rev=' }
+$apiTotal = $apis.Count
+$apiIndex = 0
+$apis | ForEach-Object {
     $api = $_
-    Write-Host "  $($api.Name)" -ForegroundColor Gray
+    $apiIndex++
+    Write-Progress -Activity "Scanning API policies" `
+        -Status "$apiIndex of $apiTotal : $($api.Name)" `
+        -PercentComplete (($apiIndex / $apiTotal) * 100)
 
-    # API-level policy
     Find-InPolicy (Get-PolicyXml "/apis/$($api.ApiId)") "API Policy" $api.Name
-
-    # Operations
-    Get-AzApiManagementOperation -Context $apimCtx -ApiId $api.ApiId | ForEach-Object {
-        $op    = $_
-        $label = "$($api.Name)  ›  $($op.Name)"
-
-        # URL template (opt-in only — searching by term often matches every
-        # operation in an API that uses the term as its base path)
-        if ($SearchUrls -and [regex]::IsMatch($op.UrlTemplate, $escaped, $rxOptions)) {
-            $script:results.Add([PSCustomObject]@{
-                Level   = "Operation URL"
-                Name    = $label
-                Matches = 1
-                Line    = "-"
-                Snippet = "$($op.Method) $($op.UrlTemplate)"
-            })
-        }
-
-        # Operation policy (only if explicitly defined at this level)
-        Find-InPolicy (Get-PolicyXml "/apis/$($api.ApiId)/operations/$($op.OperationId)") "Operation Policy" $label
-    }
 }
+
+Write-Progress -Activity "Scanning API policies" -Completed
 
 # ── Results ───────────────────────────────────────────────────────────────────
 
