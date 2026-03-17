@@ -89,9 +89,17 @@ $basePath = "/subscriptions/$subId/resourceGroups/$($apim.ResourceGroupName)" +
 $apiVer   = "api-version=2022-08-01"
 
 function Get-PolicyXml([string]$ResourcePath) {
-    # Do NOT use format=rawxml — it causes APIM to resolve <base /> and return
-    # the full inherited/effective policy, making every child operation match
-    # anything found in a parent policy.
+    # Step 1: LIST endpoint — returns an empty array when no custom policy is
+    # explicitly defined at this level. This is the only reliable way to
+    # distinguish "has a custom policy" from "inherits parent policy", since
+    # the single-resource GET returns the effective/inherited policy either way.
+    $listResp = Invoke-AzRestMethod -Method GET `
+        -Path "$basePath$ResourcePath/policies?$apiVer"
+    if ($listResp.StatusCode -ne 200) { return $null }
+    $policyList = ($listResp.Content | ConvertFrom-Json).value
+    if (-not $policyList -or $policyList.Count -eq 0) { return $null }
+
+    # Step 2: Fetch the actual policy XML (custom policy confirmed to exist)
     $response = Invoke-AzRestMethod -Method GET `
         -Path "$basePath$ResourcePath/policies/policy?$apiVer"
     if ($response.StatusCode -ne 200) { return $null }
@@ -102,19 +110,6 @@ function Get-PolicyXml([string]$ResourcePath) {
     # common words that cause false positives and is never user-authored.
     $xml = [regex]::Replace($xml, '<!--.*?-->', '', `
         [System.Text.RegularExpressions.RegexOptions]::Singleline)
-
-    # Skip policies that contain nothing beyond the default structural elements.
-    # If only <policies>, <inbound>, <backend>, <outbound>, <on-error>, and
-    # <base /> remain, this is just an inherited placeholder — not a custom policy.
-    $customOnly = $xml `
-        -replace '<\?xml[^>]*\?>', '' `
-        -replace '</?policies\s*>', '' `
-        -replace '</?inbound\s*>', '' `
-        -replace '</?backend\s*>', '' `
-        -replace '</?outbound\s*>', '' `
-        -replace '</?on-error\s*>', '' `
-        -replace '<base\s*/>', ''
-    if (($customOnly -replace '\s', '') -eq '') { return $null }
 
     return $xml
 }
