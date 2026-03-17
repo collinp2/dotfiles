@@ -89,17 +89,34 @@ $basePath = "/subscriptions/$subId/resourceGroups/$($apim.ResourceGroupName)" +
 $apiVer   = "api-version=2022-08-01"
 
 function Get-PolicyXml([string]$ResourcePath) {
+    # Do NOT use format=rawxml — it causes APIM to resolve <base /> and return
+    # the full inherited/effective policy, making every child operation match
+    # anything found in a parent policy.
     $response = Invoke-AzRestMethod -Method GET `
-        -Path "$basePath$ResourcePath/policies/policy?$apiVer&format=rawxml"
-    if ($response.StatusCode -eq 200) {
-        $xml = ($response.Content | ConvertFrom-Json).properties.value
-        # Strip Azure's boilerplate comment block (<!-- ... -->) — it contains
-        # common words that cause false positives and is never user-authored.
-        $xml = [regex]::Replace($xml, '<!--.*?-->', '', `
-            [System.Text.RegularExpressions.RegexOptions]::Singleline)
-        return $xml
-    }
-    return $null  # 404 = no policy defined at this level
+        -Path "$basePath$ResourcePath/policies/policy?$apiVer"
+    if ($response.StatusCode -ne 200) { return $null }
+
+    $xml = ($response.Content | ConvertFrom-Json).properties.value
+
+    # Strip Azure's boilerplate comment block (<!-- ... -->) — it contains
+    # common words that cause false positives and is never user-authored.
+    $xml = [regex]::Replace($xml, '<!--.*?-->', '', `
+        [System.Text.RegularExpressions.RegexOptions]::Singleline)
+
+    # Skip policies that contain nothing beyond the default structural elements.
+    # If only <policies>, <inbound>, <backend>, <outbound>, <on-error>, and
+    # <base /> remain, this is just an inherited placeholder — not a custom policy.
+    $customOnly = $xml `
+        -replace '<\?xml[^>]*\?>', '' `
+        -replace '</?policies\s*>', '' `
+        -replace '</?inbound\s*>', '' `
+        -replace '</?backend\s*>', '' `
+        -replace '</?outbound\s*>', '' `
+        -replace '</?on-error\s*>', '' `
+        -replace '<base\s*/>', ''
+    if (($customOnly -replace '\s', '') -eq '') { return $null }
+
+    return $xml
 }
 
 # ── Setup ─────────────────────────────────────────────────────────────────────
