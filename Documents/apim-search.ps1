@@ -25,13 +25,18 @@
 #>
 
 param(
-    [Parameter(HelpMessage = "String to search for")]
-    [string]$SearchTerm = "admissions-decision-processing",
-
+    [string]$SearchTerm,
     [switch]$CaseSensitive
 )
 
-# ── Debug ─────────────────────────────────────────────────────────────────────
+# ── Prompt if not provided ────────────────────────────────────────────────────
+if (-not $SearchTerm) {
+    $SearchTerm = Read-Host "Search term"
+}
+if (-not $SearchTerm) {
+    Write-Error "No search term provided."
+    exit 1
+}
 Write-Host "Searching for: '$SearchTerm'" -ForegroundColor Magenta
 
 # ── Verify Azure login ────────────────────────────────────────────────────────
@@ -145,6 +150,13 @@ $apis | ForEach-Object {
         -PercentComplete (($apiIndex / $apiTotal) * 100)
 
     Find-InPolicy (Get-PolicyXml "/apis/$($api.ApiId)") "API Policy" $api.Name
+
+    # Operations
+    Get-AzApiManagementOperation -Context $apimCtx -ApiId $api.ApiId | ForEach-Object {
+        $op    = $_
+        $label = "$($api.Name)  ›  $($op.Name)"
+        Find-InPolicy (Get-PolicyXml "/apis/$($api.ApiId)/operations/$($op.OperationId)") "Operation Policy" $label
+    }
 }
 
 Write-Progress -Activity "Scanning API policies" -Completed
