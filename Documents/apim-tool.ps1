@@ -141,26 +141,16 @@ function Invoke-ApimApi {
         ContentType = $ContentType
         ErrorAction = 'Stop'
     }
-    if ($Body -ne $null) {
-        if ($Body -is [string]) {
-            $params.Body = [System.Text.Encoding]::UTF8.GetBytes($Body)
-        } else {
-            $params.Body = [System.Text.Encoding]::UTF8.GetBytes(($Body | ConvertTo-Json -Depth 20 -Compress))
-        }
+    if ($null -ne $Body) {
+        $params.Body = if ($Body -is [string]) { $Body } else { $Body | ConvertTo-Json -Depth 20 -Compress }
     }
 
     try {
-        $response = Invoke-WebRequest @params
-        if ($RawResponse) { return $response }
-        $text = if ($response.Content -is [byte[]]) {
-            [System.Text.Encoding]::UTF8.GetString($response.Content)
-        } else {
-            $response.Content
+        if ($RawResponse) {
+            return Invoke-WebRequest @params
         }
-        if ($text -and $text.Trim() -ne '') {
-            return $text | ConvertFrom-Json
-        }
-        return $null
+        # Invoke-RestMethod parses JSON automatically and handles PS5/PS7 encoding correctly
+        return Invoke-RestMethod @params
     } catch {
         $statusCode = 0
         try { $statusCode = [int]$_.Exception.Response.StatusCode } catch { }
@@ -170,12 +160,6 @@ function Invoke-ApimApi {
         $msg = $_.Exception.Message
         try {
             $errResp = $_.ErrorDetails.Message
-            if (-not $errResp) {
-                $stream = $_.Exception.Response.GetResponseStream()
-                $ms = New-Object System.IO.MemoryStream
-                $stream.CopyTo($ms)
-                $errResp = [System.Text.Encoding]::UTF8.GetString($ms.ToArray())
-            }
             if ($errResp) { $msg = "$msg`n$errResp" }
         } catch { }
         throw "APIM API call failed [$Method $Uri]: $msg"
@@ -197,19 +181,10 @@ function Wait-ForAsyncOperation {
     while ($elapsed -lt $TimeoutSeconds) {
         Start-Sleep -Seconds $delay
         $elapsed += $delay
-        $result = Invoke-ApimApi -Uri $AsyncUrl -Headers $Headers -RawResponse
-        $status = $null
         try {
-            $rawText = if ($result.Content -is [byte[]]) {
-                [System.Text.Encoding]::UTF8.GetString($result.Content)
-            } else {
-                $result.Content
-            }
-            $json = $rawText | ConvertFrom-Json
-            $status = $json.status
-        } catch { }
-
-        if ($result.StatusCode -eq 200 -or $result.StatusCode -eq 201) {
+            $json = Invoke-RestMethod -Uri $AsyncUrl -Headers $Headers -ErrorAction Stop
+            $status = $null
+            try { $status = $json.status } catch { }
             if (-not $status -or $status -eq 'Succeeded') {
                 Write-Step "Async operation succeeded" -Level Success
                 return $json
@@ -217,11 +192,16 @@ function Wait-ForAsyncOperation {
             if ($status -eq 'Failed') {
                 throw "Async operation failed: $($json | ConvertTo-Json -Compress)"
             }
-        }
-        if ($result.StatusCode -eq 202) {
-            # Still in progress
+            # Still in progress (InProgress status)
             Write-Step "  Still in progress... ($elapsed/$TimeoutSeconds s)"
-            continue
+        } catch {
+            $sc = 0
+            try { $sc = [int]$_.Exception.Response.StatusCode } catch { }
+            if ($sc -eq 202) {
+                Write-Step "  Still in progress... ($elapsed/$TimeoutSeconds s)"
+                continue
+            }
+            throw
         }
     }
     throw "Async operation timed out after ${TimeoutSeconds}s"
@@ -574,8 +554,6 @@ function Import-Api {
     }
     $putApiUri = "$BaseUri/apis/$($apiId)?api-version=$API_VERSION"
     $putResp = Invoke-ApimApi -Method PUT -Uri $putApiUri -Headers $headers -Body $putApiBody -RawResponse
-    $putRespObj = Invoke-ApimApi -Method PUT -Uri $putApiUri -Headers $headers -Body $putApiBody
-    # Handle async
     if ($putResp -and $putResp.StatusCode -eq 202) {
         $asyncUrl = $putResp.Headers['Azure-AsyncOperation']
         if (-not $asyncUrl) { $asyncUrl = $putResp.Headers['Location'] }
