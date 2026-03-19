@@ -152,7 +152,11 @@ function Invoke-ApimApi {
     try {
         $response = Invoke-WebRequest @params
         if ($RawResponse) { return $response }
-        $text = [System.Text.Encoding]::UTF8.GetString($response.Content)
+        $text = if ($response.Content -is [byte[]]) {
+            [System.Text.Encoding]::UTF8.GetString($response.Content)
+        } else {
+            $response.Content
+        }
         if ($text -and $text.Trim() -ne '') {
             return $text | ConvertFrom-Json
         }
@@ -165,11 +169,14 @@ function Invoke-ApimApi {
         }
         $msg = $_.Exception.Message
         try {
-            $stream = $_.Exception.Response.GetResponseStream()
-            $ms = New-Object System.IO.MemoryStream
-            $stream.CopyTo($ms)
-            $errBody = [System.Text.Encoding]::UTF8.GetString($ms.ToArray())
-            $msg = "$msg`n$errBody"
+            $errResp = $_.ErrorDetails.Message
+            if (-not $errResp) {
+                $stream = $_.Exception.Response.GetResponseStream()
+                $ms = New-Object System.IO.MemoryStream
+                $stream.CopyTo($ms)
+                $errResp = [System.Text.Encoding]::UTF8.GetString($ms.ToArray())
+            }
+            if ($errResp) { $msg = "$msg`n$errResp" }
         } catch { }
         throw "APIM API call failed [$Method $Uri]: $msg"
     }
@@ -193,7 +200,12 @@ function Wait-ForAsyncOperation {
         $result = Invoke-ApimApi -Uri $AsyncUrl -Headers $Headers -RawResponse
         $status = $null
         try {
-            $json = [System.Text.Encoding]::UTF8.GetString($result.Content) | ConvertFrom-Json
+            $rawText = if ($result.Content -is [byte[]]) {
+                [System.Text.Encoding]::UTF8.GetString($result.Content)
+            } else {
+                $result.Content
+            }
+            $json = $rawText | ConvertFrom-Json
             $status = $json.status
         } catch { }
 
