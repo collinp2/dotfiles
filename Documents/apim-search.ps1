@@ -161,6 +161,22 @@ $apis | ForEach-Object {
 
 Write-Progress -Activity "Scanning API policies" -Completed
 
+# Policy fragments
+Write-Host "Checking policy fragments..." -ForegroundColor Cyan
+$fragResp = Invoke-AzRestMethod -Method GET `
+    -Path "$basePath/policyFragments?$apiVer"
+if ($fragResp.StatusCode -eq 200) {
+    ($fragResp.Content | ConvertFrom-Json).value | ForEach-Object {
+        $frag = $_
+        $xml  = $frag.properties.value
+        if ($xml) {
+            $xml = [regex]::Replace($xml, '<!--.*?-->', '', `
+                [System.Text.RegularExpressions.RegexOptions]::Singleline)
+            Find-InPolicy $xml "Policy Fragment" $frag.name
+        }
+    }
+}
+
 # ── Results ───────────────────────────────────────────────────────────────────
 
 Write-Host ""
