@@ -159,9 +159,7 @@ function Invoke-ApimApi {
         return $null
     } catch {
         $statusCode = 0
-        if ($_.Exception.Response) {
-            $statusCode = [int]$_.Exception.Response.StatusCode
-        }
+        try { $statusCode = [int]$_.Exception.Response.StatusCode } catch { }
         if ($AllowNotFound -and ($statusCode -eq 404 -or $statusCode -eq 204)) {
             return $null
         }
