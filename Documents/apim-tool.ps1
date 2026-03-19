@@ -182,11 +182,10 @@ function Invoke-ApimApi {
         }
         $msg = $_.Exception.Message
         try {
-            $errBody = [System.Text.Encoding]::UTF8.GetString($_.Exception.Response.GetResponseStream() | ForEach-Object {
-                $ms = New-Object System.IO.MemoryStream
-                $_.CopyTo($ms)
-                $ms.ToArray()
-            })
+            $stream = $_.Exception.Response.GetResponseStream()
+            $ms = New-Object System.IO.MemoryStream
+            $stream.CopyTo($ms)
+            $errBody = [System.Text.Encoding]::UTF8.GetString($ms.ToArray())
             $msg = "$msg`n$errBody"
         } catch { }
         throw "APIM API call failed [$Method $Uri]: $msg"
