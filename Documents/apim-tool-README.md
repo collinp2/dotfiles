@@ -10,27 +10,42 @@ Designed for **dev → test → prod** promotion workflows. No external modules 
 
 - PowerShell 5.1 or later
 - One of:
-  - **Azure CLI** (`az`) logged in via `az login` _(recommended)_
+  - **Az PowerShell module** logged in via `Connect-AzAccount` _(recommended)_
+  - **Azure CLI** (`az`) logged in via `az login`
   - A **service principal** with Contributor access to both source and target APIM instances
 
 ---
 
 ## Usage
 
-### Export
+### Export (auto-detect APIM from current login)
 
 ```powershell
-.\apim-tool.ps1 export `
-  -SubscriptionId "abc-123" `
-  -ResourceGroup  "rg-dev" `
-  -ServiceName    "my-apim-dev" `
-  -ApiId          "my-api" `
-  -OutputFile     "my-api-export.zip"
+.\apim-tool.ps1 export -ApiId "my-api" -OutputFile "my-api-export.zip"
 ```
 
-### Import
+If multiple APIM instances exist in the subscription, you will be prompted to choose one.
+
+### Import (auto-detect target APIM)
 
 ```powershell
+.\apim-tool.ps1 import -ZipFile "my-api-export.zip" -ParametersFile "parameters.prod.json"
+```
+
+### Explicit Target (skip auto-detection)
+
+Supply all three location params to skip the auto-detect step entirely:
+
+```powershell
+# Export
+.\apim-tool.ps1 export `
+  -ApiId          "my-api" `
+  -OutputFile     "my-api-export.zip" `
+  -SubscriptionId "abc-123" `
+  -ResourceGroup  "rg-dev" `
+  -ServiceName    "my-apim-dev"
+
+# Import
 .\apim-tool.ps1 import `
   -ZipFile        "my-api-export.zip" `
   -ParametersFile "parameters.prod.json" `
@@ -41,7 +56,7 @@ Designed for **dev → test → prod** promotion workflows. No external modules 
 
 ### Service Principal Auth (optional)
 
-If you're not using `az login`, pass credentials directly:
+If you're not using `Connect-AzAccount` or `az login`, pass credentials directly:
 
 ```powershell
 .\apim-tool.ps1 export ... `
@@ -54,19 +69,19 @@ If you're not using `az login`, pass credentials directly:
 
 ## Parameters
 
-| Parameter | Mode | Description |
-|---|---|---|
-| `export` / `import` | both | First positional argument — selects mode |
-| `-SubscriptionId` | both | Azure subscription ID |
-| `-ResourceGroup` | both | Resource group of the APIM instance |
-| `-ServiceName` | both | APIM service name |
-| `-ApiId` | export | API identifier to export |
-| `-OutputFile` | export | Path for the output ZIP file |
-| `-ZipFile` | import | Path to a previously exported ZIP |
-| `-ParametersFile` | import | Path to your filled-in parameters JSON |
-| `-TenantId` | both | Azure AD tenant ID (service principal auth) |
-| `-ClientId` | both | Service principal client ID |
-| `-ClientSecret` | both | Service principal secret |
+| Parameter | Mode | Required | Description |
+|---|---|---|---|
+| `export` / `import` | both | yes | First positional argument — selects mode |
+| `-ApiId` | export | yes | API identifier to export |
+| `-OutputFile` | export | yes | Path for the output ZIP file |
+| `-ZipFile` | import | yes | Path to a previously exported ZIP |
+| `-ParametersFile` | import | yes | Path to your filled-in parameters JSON |
+| `-SubscriptionId` | both | no | Azure subscription ID (auto-detected from current login) |
+| `-ResourceGroup` | both | no | Resource group of the APIM instance (auto-detected) |
+| `-ServiceName` | both | no | APIM service name (auto-detected) |
+| `-TenantId` | both | no | Azure AD tenant ID (service principal auth) |
+| `-ClientId` | both | no | Service principal client ID |
+| `-ClientSecret` | both | no | Service principal secret |
 
 ---
 
@@ -90,15 +105,17 @@ my-api-export.zip
 ## Typical Workflow
 
 ```
-1. Export from dev
-   .\apim-tool.ps1 export -ApiId my-api -OutputFile my-api.zip ...
+1. Log in to the source environment and export
+   Connect-AzAccount   # or: az login
+   .\apim-tool.ps1 export -ApiId my-api -OutputFile my-api.zip
 
 2. Create a parameters file for the target environment
    Copy-Item parameters.template.json parameters.prod.json
    # Edit parameters.prod.json — fill in backendUrl and any named value secrets
 
-3. Import to prod
-   .\apim-tool.ps1 import -ZipFile my-api.zip -ParametersFile parameters.prod.json ...
+3. Switch context to the target subscription (if different), then import
+   Set-AzContext -Subscription "prod-subscription-id"
+   .\apim-tool.ps1 import -ZipFile my-api.zip -ParametersFile parameters.prod.json
 ```
 
 ---
@@ -151,7 +168,8 @@ Named value references (`{{my-named-value}}`) are left as-is — APIM resolves t
 | API has >100 operations | `nextLink` pagination followed automatically |
 | PUT returns HTTP 202 | Async operation polled up to 120 seconds |
 | `FILL_ME_IN` value in parameters | Warning printed; that named value skipped; import continues |
-| `az` not logged in | Clear error: _"run az login or supply -ClientId/-ClientSecret/-TenantId"_ |
+| Not logged in | Clear error: _"Run Connect-AzAccount or az login, or supply -ClientId/-ClientSecret/-TenantId"_ |
+| Multiple APIM instances | Numbered prompt — choose the target instance |
 
 ---
 

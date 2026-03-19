@@ -8,15 +8,23 @@
     dev -> test -> prod promotion workflows.
 
 .EXAMPLE
-    # Export
+    # Export — auto-detect APIM instance from current login
+    .\apim-tool.ps1 export -ApiId "my-api" -OutputFile "my-api-export.zip"
+
+    # Export — explicit target (useful when multiple APIM instances exist)
     .\apim-tool.ps1 export `
+      -ApiId "my-api" `
+      -OutputFile "my-api-export.zip" `
       -SubscriptionId "abc-123" `
       -ResourceGroup "rg-dev" `
-      -ServiceName "my-apim-dev" `
-      -ApiId "my-api" `
-      -OutputFile "my-api-export.zip"
+      -ServiceName "my-apim-dev"
 
-    # Import
+    # Import — auto-detect target APIM from current login
+    .\apim-tool.ps1 import `
+      -ZipFile "my-api-export.zip" `
+      -ParametersFile "parameters.prod.json"
+
+    # Import — explicit target
     .\apim-tool.ps1 import `
       -ZipFile "my-api-export.zip" `
       -ParametersFile "parameters.prod.json" `
@@ -80,7 +88,22 @@ function Get-BearerToken {
     param([string]$ClientId, [string]$ClientSecret, [string]$TenantId)
 
     if (-not $ClientId) {
-        # Try az CLI
+        # Try Az PowerShell module first (consistent with auto-detection)
+        try {
+            $azToken = Get-AzAccessToken -ResourceUrl 'https://management.azure.com/'
+            $tok = if ($azToken.Token -is [System.Security.SecureString]) {
+                [System.Runtime.InteropServices.Marshal]::PtrToStringAuto(
+                    [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($azToken.Token))
+            } else {
+                $azToken.Token
+            }
+            if ($tok) {
+                Write-Step "Authenticated via Az module"
+                return $tok
+            }
+        } catch { }
+
+        # Fall back to az CLI
         try {
             $result = & az account get-access-token --resource https://management.azure.com/ 2>$null | ConvertFrom-Json
             if ($result.accessToken) {
@@ -88,7 +111,7 @@ function Get-BearerToken {
                 return $result.accessToken
             }
         } catch { }
-        throw "No bearer token available. Run 'az login' or supply -ClientId / -ClientSecret / -TenantId."
+        throw "No bearer token available. Run 'Connect-AzAccount' or 'az login', or supply -ClientId / -ClientSecret / -TenantId."
     }
 
     if (-not $TenantId) { throw "-TenantId is required when using service principal auth." }
@@ -679,25 +702,54 @@ function Assert-Param {
 
 Write-Step "APIM Tool — mode: $Mode"
 
+# ── Auto-detect APIM instance if not fully specified ──────────────────────────
+if (-not $SubscriptionId -or -not $ResourceGroup -or -not $ServiceName) {
+    Write-Step "Auto-detecting APIM instance from current Azure login..."
+
+    $azCtx = Get-AzContext
+    if (-not $azCtx) {
+        throw "Not logged in to Azure. Run 'Connect-AzAccount' first, or supply -SubscriptionId, -ResourceGroup, -ServiceName."
+    }
+    Write-Step "Subscription: $($azCtx.Subscription.Name)"
+
+    $instances = Get-AzApiManagement
+    if (-not $instances) {
+        throw "No APIM instances found in subscription '$($azCtx.Subscription.Name)'. Supply -ResourceGroup and -ServiceName explicitly."
+    }
+
+    $apim = $null
+    if ($instances.Count -eq 1) {
+        $apim = $instances[0]
+        Write-Step "Using APIM: $($apim.Name)  ($($apim.ResourceGroupName))"
+    } else {
+        Write-Host ""
+        Write-Host "Multiple APIM instances found:" -ForegroundColor Yellow
+        for ($i = 0; $i -lt $instances.Count; $i++) {
+            Write-Host "  [$i] $($instances[$i].Name)  ($($instances[$i].ResourceGroupName))"
+        }
+        $choice = Read-Host "Enter number"
+        $apim = $instances[[int]$choice]
+        Write-Step "Using APIM: $($apim.Name)  ($($apim.ResourceGroupName))"
+    }
+
+    if (-not $SubscriptionId) { $SubscriptionId = $azCtx.Subscription.Id }
+    if (-not $ResourceGroup)  { $ResourceGroup  = $apim.ResourceGroupName }
+    if (-not $ServiceName)    { $ServiceName    = $apim.Name }
+}
+
 $token = Get-BearerToken -ClientId $ClientId -ClientSecret $ClientSecret -TenantId $TenantId
 
 switch ($Mode) {
     'export' {
-        Assert-Param -Value $SubscriptionId -Name SubscriptionId
-        Assert-Param -Value $ResourceGroup  -Name ResourceGroup
-        Assert-Param -Value $ServiceName    -Name ServiceName
-        Assert-Param -Value $ApiId          -Name ApiId
-        Assert-Param -Value $OutputFile     -Name OutputFile
+        Assert-Param -Value $ApiId      -Name ApiId
+        Assert-Param -Value $OutputFile -Name OutputFile
 
         $baseUri = Build-ApimBaseUri -SubscriptionId $SubscriptionId -ResourceGroup $ResourceGroup -ServiceName $ServiceName
         Export-Api -Token $token -BaseUri $baseUri -ApiId $ApiId -OutputFile $OutputFile
     }
     'import' {
-        Assert-Param -Value $SubscriptionId  -Name SubscriptionId
-        Assert-Param -Value $ResourceGroup   -Name ResourceGroup
-        Assert-Param -Value $ServiceName     -Name ServiceName
-        Assert-Param -Value $ZipFile         -Name ZipFile
-        Assert-Param -Value $ParametersFile  -Name ParametersFile
+        Assert-Param -Value $ZipFile        -Name ZipFile
+        Assert-Param -Value $ParametersFile -Name ParametersFile
 
         if (-not (Test-Path $ZipFile)) { throw "ZIP file not found: $ZipFile" }
 
