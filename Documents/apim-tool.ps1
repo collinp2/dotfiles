@@ -88,22 +88,7 @@ function Get-BearerToken {
     param([string]$ClientId, [string]$ClientSecret, [string]$TenantId)
 
     if (-not $ClientId) {
-        # Try Az PowerShell module first (consistent with auto-detection)
-        try {
-            $azToken = Get-AzAccessToken -ResourceUrl 'https://management.azure.com/'
-            $tok = if ($azToken.Token -is [System.Security.SecureString]) {
-                [System.Runtime.InteropServices.Marshal]::PtrToStringAuto(
-                    [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($azToken.Token))
-            } else {
-                $azToken.Token
-            }
-            if ($tok) {
-                Write-Step "Authenticated via Az module"
-                return $tok
-            }
-        } catch { }
-
-        # Fall back to az CLI
+        # Try az CLI (reliable in Cloud Shell and local installs)
         try {
             $result = & az account get-access-token --resource https://management.azure.com/ 2>$null | ConvertFrom-Json
             if ($result.accessToken) {
@@ -111,7 +96,7 @@ function Get-BearerToken {
                 return $result.accessToken
             }
         } catch { }
-        throw "No bearer token available. Run 'Connect-AzAccount' or 'az login', or supply -ClientId / -ClientSecret / -TenantId."
+        throw "No bearer token available. Run 'az login', or supply -ClientId / -ClientSecret / -TenantId."
     }
 
     if (-not $TenantId) { throw "-TenantId is required when using service principal auth." }
