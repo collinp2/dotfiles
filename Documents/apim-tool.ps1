@@ -349,7 +349,7 @@ function Export-Api {
     while ($nextLink) {
         $page = Invoke-ApimApi -Uri $nextLink -Headers $headers
         $operations += $page.value
-        $nextLink = $page.nextLink
+        $nextLink = $page.PSObject.Properties['nextLink']?.Value
         if ($nextLink -and -not $nextLink.StartsWith('http')) {
             $nextLink = "https://management.azure.com$nextLink"
         }
@@ -395,7 +395,7 @@ function Export-Api {
     while ($allNvPage) {
         $nvPage = Invoke-ApimApi -Uri $allNvPage -Headers $headers
         $allNvs += $nvPage.value
-        $allNvPage = $nvPage.nextLink
+        $allNvPage = $nvPage.PSObject.Properties['nextLink']?.Value
         if ($allNvPage -and -not $allNvPage.StartsWith('http')) {
             $allNvPage = "https://management.azure.com$allNvPage"
         }
