@@ -167,6 +167,7 @@ Named value references (`{{my-named-value}}`) are left as-is — APIM resolves t
 | Named value is a secret | Name and `secret: true` flag exported; value never included |
 | API has >100 operations | `nextLink` pagination followed automatically |
 | PUT returns HTTP 202 | Async operation polled up to 120 seconds |
+| Running in Azure Cloud Shell | After export completes, prompted to press `1` to trigger a browser download of the ZIP |
 | `FILL_ME_IN` value in parameters | Warning printed; that named value skipped; import continues |
 | Not logged in | Clear error: _"Run Connect-AzAccount or az login, or supply -ClientId/-ClientSecret/-TenantId"_ |
 | Multiple APIM instances | Numbered prompt — choose the target instance |
