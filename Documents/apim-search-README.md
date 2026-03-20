@@ -43,13 +43,14 @@ If multiple APIM instances exist in the subscription, you will be prompted to ch
 
 ## What Gets Searched
 
-| Scope | Notes |
+| Scope | Fields searched |
 |---|---|
-| Global policy | The tenant-wide inbound/outbound policy |
-| Product policies | One per product in the APIM instance |
-| API-level policies | One per API (current revision only) |
-| Operation-level policies | One per operation per API |
-| Policy fragments | All named reusable policy fragments |
+| Global policy | Policy XML content |
+| Products | `title`, `description`; policy XML |
+| APIs | `displayName`, `path`, `serviceUrl` (backend URL), `description`; policy XML |
+| Operations | `displayName`, `urlTemplate`, `description`; policy XML |
+| Named values | `name`, `displayName`, `tags`; `value` for non-secret entries (if returned by API) |
+| Policy fragments | Fragment XML content |
 
 ---
 

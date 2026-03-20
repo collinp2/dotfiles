@@ -1,15 +1,18 @@
 <#
 .SYNOPSIS
-    Search Azure APIM global, product, and API-level policies for a specific term.
+    Search Azure APIM policies, API definitions, operation definitions, and named values for a specific term.
 
 .DESCRIPTION
     Auto-detects the APIM instance from your current Azure login. If multiple
     instances exist in the subscription, you will be prompted to choose one.
 
-    Searches: global policy, product policies, and API-level policies.
-    Operation-level policy search is excluded — the APIM REST API returns
-    effective/inherited content at the operation level regardless of format,
-    making operation results unreliable.
+    Searches:
+      - Global policy
+      - Product definitions (title, description) and policies
+      - API definitions (display name, path, backend URL, description) and policies
+      - Operation definitions (display name, URL template, description) and policies
+      - Named values (name, display name, tags, and value for non-secret entries)
+      - Policy fragments
 
 .PARAMETER SearchTerm
     The string to search for. Treated as a literal string (not regex).
@@ -104,6 +107,27 @@ $rxOptions = if ($CaseSensitive) {
 }
 $escaped = [regex]::Escape($SearchTerm)
 
+function Find-InFields {
+    param([string]$Level, [string]$Name, [hashtable]$Fields)
+    $matched = @()
+    foreach ($key in $Fields.Keys) {
+        $val = $Fields[$key]
+        if (-not $val) { continue }
+        if ([regex]::IsMatch([string]$val, $escaped, $rxOptions)) {
+            $matched += "$($key): $val"
+        }
+    }
+    if ($matched.Count -gt 0) {
+        $script:results.Add([PSCustomObject]@{
+            Level   = $Level
+            Name    = $Name
+            Matches = $matched.Count
+            Line    = '-'
+            Snippet = $matched[0]
+        })
+    }
+}
+
 function Find-InPolicy {
     param([string]$Xml, [string]$Level, [string]$Name)
     if (-not $Xml) { return }
@@ -131,35 +155,47 @@ function Find-InPolicy {
 Write-Host "Checking global policy..." -ForegroundColor Cyan
 Find-InPolicy (Get-PolicyXml "") "Global" "Global"
 
-# Product policies
-Write-Host "Checking product policies..." -ForegroundColor Cyan
+# Product definitions + policies
+Write-Host "Checking products..." -ForegroundColor Cyan
 Get-AzApiManagementProduct -Context $apimCtx | ForEach-Object {
-    Find-InPolicy (Get-PolicyXml "/products/$($_.ProductId)") "Product" $_.Title
+    Find-InFields 'Product' $_.Title @{ title = $_.Title; description = $_.Description }
+    Find-InPolicy (Get-PolicyXml "/products/$($_.ProductId)") "Product Policy" $_.Title
 }
 
-# API-level policies (skip non-current revisions)
-Write-Host "Checking API policies..." -ForegroundColor Cyan
+# API definitions + policies (skip non-current revisions)
+Write-Host "Checking APIs..." -ForegroundColor Cyan
 $apis = Get-AzApiManagementApi -Context $apimCtx | Where-Object { $_.ApiId -notmatch ';rev=' }
 $apiTotal = $apis.Count
 $apiIndex = 0
 $apis | ForEach-Object {
     $api = $_
     $apiIndex++
-    Write-Progress -Activity "Scanning API policies" `
+    Write-Progress -Activity "Scanning APIs" `
         -Status "$apiIndex of $apiTotal : $($api.Name)" `
         -PercentComplete (($apiIndex / $apiTotal) * 100)
 
+    Find-InFields 'API' $api.Name @{
+        displayName = $api.Name
+        path        = $api.Path
+        serviceUrl  = $api.ServiceUrl
+        description = $api.Description
+    }
     Find-InPolicy (Get-PolicyXml "/apis/$($api.ApiId)") "API Policy" $api.Name
 
     # Operations
     Get-AzApiManagementOperation -Context $apimCtx -ApiId $api.ApiId | ForEach-Object {
         $op    = $_
         $label = "$($api.Name)  ›  $($op.Name)"
+        Find-InFields 'Operation' $label @{
+            displayName  = $op.Name
+            urlTemplate  = $op.UrlTemplate
+            description  = $op.Description
+        }
         Find-InPolicy (Get-PolicyXml "/apis/$($api.ApiId)/operations/$($op.OperationId)") "Operation Policy" $label
     }
 }
 
-Write-Progress -Activity "Scanning API policies" -Completed
+Write-Progress -Activity "Scanning APIs" -Completed
 
 # Policy fragments
 Write-Host "Checking policy fragments..." -ForegroundColor Cyan
@@ -174,6 +210,27 @@ if ($fragResp.StatusCode -eq 200) {
                 [System.Text.RegularExpressions.RegexOptions]::Singleline)
             Find-InPolicy $xml "Policy Fragment" $frag.name
         }
+    }
+}
+
+# Named values
+Write-Host "Checking named values..." -ForegroundColor Cyan
+$nvResp = Invoke-AzRestMethod -Method GET -Path "$basePath/namedValues?$apiVer"
+if ($nvResp.StatusCode -eq 200) {
+    ($nvResp.Content | ConvertFrom-Json).value | ForEach-Object {
+        $nv     = $_
+        $tags   = if ($nv.properties.tags) { $nv.properties.tags -join ', ' } else { $null }
+        $fields = @{
+            name        = $nv.name
+            displayName = $nv.properties.displayName
+            tags        = $tags
+        }
+        # Include value for non-secret named values if the API returns it
+        if (-not $nv.properties.secret -and
+            $nv.properties.PSObject.Properties['value'] -and $nv.properties.value) {
+            $fields['value'] = $nv.properties.value
+        }
+        Find-InFields 'Named Value' $nv.properties.displayName $fields
     }
 }
 
