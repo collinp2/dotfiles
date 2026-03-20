@@ -720,6 +720,17 @@ switch ($Mode) {
 
         $baseUri = Build-ApimBaseUri -SubscriptionId $SubscriptionId -ResourceGroup $ResourceGroup -ServiceName $ServiceName
         Export-Api -Token $token -BaseUri $baseUri -ApiId $ApiId -OutputFile $OutputFile
+
+        # Offer browser download when running in Azure Cloud Shell
+        if ($env:ACC_CLOUD -or $env:AZURE_HTTP_USER_AGENT) {
+            Write-Host ""
+            Write-Host "  Press 1 to download the ZIP, or any other key to skip: " -ForegroundColor Cyan -NoNewline
+            $key = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown').Character
+            Write-Host ""
+            if ($key -eq '1') {
+                bash -c "download '$OutputFile'"
+            }
+        }
     }
     'import' {
         Assert-Param -Value $ZipFile        -Name ZipFile
