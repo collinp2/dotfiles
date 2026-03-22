@@ -57,6 +57,48 @@ lessc styles/mobile.less styles/mobile.css
 
 **Theme variables** (color, font, layout settings) are defined as LESS variables at the top of `global.less`.
 
+## Mic Slider (Arduino + SwiftUI + React Native)
+
+Repo at https://github.com/collinp2/mic-slider, cloned to `~/Documents/mic-slider/`.
+
+WiFi-controlled system for positioning microphones via stepper motors. Arduino Uno R4 WiFi runs HTTP endpoints; apps talk to it over the local network.
+
+| Component | Location | Description |
+|-----------|----------|-------------|
+| Firmware | `firmware/mic-slider/mic-slider.ino` | Arduino HTTP server, 6 NEMA11 sliders |
+| macOS app | `MicSlider/` | SwiftUI app (NavigationSplitView) |
+| Android app | `MicSliderAndroid/` | React Native + Expo app |
+
+**Android app — branch:** `claude/android-app-setup-G6Ihz`
+
+**Android app structure:**
+```
+MicSliderAndroid/
+  App.tsx                          # Navigation root (React Navigation stack)
+  src/api/sliderClient.ts          # fetch() wrapper for all 6 Arduino endpoints
+  src/store/sliderStore.ts         # AsyncStorage persistence for slider configs
+  src/screens/SliderListScreen.tsx # List of configured sliders
+  src/screens/SliderDetailScreen.tsx # Jog, step size, speed, home, position bar
+  src/screens/AddSliderScreen.tsx  # Add new slider config
+  src/components/SpeakerPositionView.tsx # SVG top-down mic position diagram
+```
+
+**Run Android app:**
+```bash
+cd ~/Documents/mic-slider/MicSliderAndroid
+npm install
+npx expo start        # scan QR with Expo Go app on phone
+npm run android       # or run on connected Android device/emulator
+```
+
+**Arduino API endpoints** (all GET, JSON, `?slider=1..6`):
+- `GET /status` — `{ pos, moving, maxSteps, jogDir, homing, speed }`
+- `GET /move?dir=left|right&steps=N` — move N steps
+- `GET /jog/start?dir=left|right` — continuous movement
+- `GET /jog/stop` — stop with deceleration
+- `GET /home` — run to limit switch, zero position
+- `GET /speed?val=N` — set max speed (100–3000 steps/sec)
+
 ## Audio Plugins (JUCE/C++)
 
 Plugins live at `~/Documents/testing/`, cloned from https://github.com/collinp2/cp_software. Each plugin is on its own branch.
