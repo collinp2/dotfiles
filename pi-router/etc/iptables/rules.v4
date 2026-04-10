@@ -1,0 +1,27 @@
+# /etc/iptables/rules.v4 — Raspberry Pi Router
+# NAT + forwarding rules. Loaded at boot by iptables-persistent.
+# WAN = eth0 (modem side), LAN = wlan0 (your devices)
+
+*filter
+:INPUT ACCEPT [0:0]
+:FORWARD DROP [0:0]
+:OUTPUT ACCEPT [0:0]
+
+# Allow established/related connections from WAN back to LAN
+-A FORWARD -i eth0 -o wlan0 -m state --state RELATED,ESTABLISHED -j ACCEPT
+
+# Allow all outbound traffic from LAN to WAN
+-A FORWARD -i wlan0 -o eth0 -j ACCEPT
+
+COMMIT
+
+*nat
+:PREROUTING ACCEPT [0:0]
+:INPUT ACCEPT [0:0]
+:OUTPUT ACCEPT [0:0]
+:POSTROUTING ACCEPT [0:0]
+
+# Masquerade (NAT) all LAN traffic going out via the WAN interface
+-A POSTROUTING -o eth0 -j MASQUERADE
+
+COMMIT
