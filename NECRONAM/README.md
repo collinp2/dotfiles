@@ -1,5 +1,10 @@
 # NECRONAM — Neural Amp Necromancy
 
+![NECRONAM editor](preview.png)
+
+> Preview is a static mockup rendered from the editor's layout + theme, not a
+> screenshot of a running build.
+
 A horror-themed **Neural Amp Modeler (NAM) capture player** by VoidCraft Audio,
 built with JUCE. It does everything the official NAM ("gateway") plugin does —
 loads `.nam` captures, runs a noise gate, loads cab impulse responses, and
