@@ -26,9 +26,16 @@ NecronamAudioProcessor::NecronamAudioProcessor()
 {
     // Gate envelope feeds the post-model gain stage (NAM-style split gate).
     mNoiseGateTrigger.AddListener (&mNoiseGateGain);
+
+    // Watch the A2 quality control so we can apply it off the audio thread.
+    apvts.addParameterListener (ParamID::quality, this);
 }
 
-NecronamAudioProcessor::~NecronamAudioProcessor() = default;
+NecronamAudioProcessor::~NecronamAudioProcessor()
+{
+    apvts.removeParameterListener (ParamID::quality, this);
+    cancelPendingUpdate();
+}
 
 // ===========================================================================
 APVTS::ParameterLayout NecronamAudioProcessor::createLayout()
@@ -59,6 +66,16 @@ APVTS::ParameterLayout NecronamAudioProcessor::createLayout()
     params.push_back (fParam (ParamID::gateThresh, "Gate Threshold", Range (-100.0f, 0.0f, 0.5f), -80.0f, dbToText));
     params.push_back (bParam (ParamID::gateActive, "Gate", false));
     params.push_back (bParam (ParamID::irActive,   "IR",   true));
+
+    // A2 quality / efficiency. 0 = max efficiency (lite), 1 = max quality (full).
+    // Defaults to max quality; only affects A2 "slimmable" models.
+    params.push_back (fParam (ParamID::quality, "Quality", Range (0.0f, 1.0f, 0.01f), 1.0f,
+                              [] (float v, int)
+                              {
+                                  if (v >= 0.999f) return juce::String ("Max Quality");
+                                  if (v <= 0.001f) return juce::String ("Max Efficiency");
+                                  return juce::String (juce::roundToInt (v * 100.0f)) + "%";
+                              }));
 
     // ---- Filters ----
     params.push_back (fParam (ParamID::hpfFreq, "Hi-Pass", Range (20.0f, 2000.0f, 1.0f, 0.3f), 20.0f, hzToText));
@@ -325,11 +342,16 @@ void NecronamAudioProcessor::loadNamModel (const juce::File& file)
         if (mPrepared.load())
             wrapped->Reset (mSampleRate, mMaxBlock);
 
+        const bool slimmable = wrapped->IsSlimmable();
+        // Apply the current quality before the model goes live (not RT-safe).
+        wrapped->SetQuality (apvts.getRawParameterValue (ParamID::quality)->load());
+
         {
             const juce::SpinLock::ScopedLockType l (mModelSwapLock);
             mStagedModel = std::move (wrapped);
         }
 
+        mModelSlimmable.store (slimmable);
         mModelName = file.getFileNameWithoutExtension();
         apvts.state.setProperty ("namPath", file.getFullPathName(), nullptr);
         updateLatency();
@@ -348,7 +370,30 @@ void NecronamAudioProcessor::clearNamModel()
         mStagedModel.reset();
     }
     mModelName = {};
+    mModelSlimmable.store (false);
     apvts.state.setProperty ("namPath", "", nullptr);
+}
+
+// ===========================================================================
+void NecronamAudioProcessor::parameterChanged (const juce::String&, float)
+{
+    // May fire on the audio thread during automation; defer the (non-RT-safe)
+    // SetSlimmableSize call to the message thread.
+    triggerAsyncUpdate();
+}
+
+void NecronamAudioProcessor::handleAsyncUpdate()
+{
+    applyQuality();
+}
+
+void NecronamAudioProcessor::applyQuality()
+{
+    const double v = apvts.getRawParameterValue (ParamID::quality)->load();
+    // Hold the swap lock so the audio thread can't reassign mModel mid-apply.
+    const juce::SpinLock::ScopedLockType l (mModelSwapLock);
+    if (mModel != nullptr)        mModel->SetQuality (v);
+    if (mStagedModel != nullptr)  mStagedModel->SetQuality (v);
 }
 
 void NecronamAudioProcessor::loadImpulseResponse (const juce::File& file)

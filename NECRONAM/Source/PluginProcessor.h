@@ -22,7 +22,9 @@
 //    input gain -> noise gate -> NAM model -> gate gain -> cab IR
 //    -> DC blocker -> API-560 EQ -> saturation -> HPF -> LPF -> output
 // ============================================================================
-class NecronamAudioProcessor : public juce::AudioProcessor
+class NecronamAudioProcessor : public juce::AudioProcessor,
+                               private juce::AudioProcessorValueTreeState::Listener,
+                               private juce::AsyncUpdater
 {
 public:
     NecronamAudioProcessor();
@@ -60,6 +62,10 @@ public:
     juce::String getLoadedModelName() const { return mModelName; }
     juce::String getLoadedIRName()    const { return mIRName;    }
 
+    // True when the loaded model is an A2 "slimmable" model that responds to
+    // the Quality control (older A1 models always return false).
+    bool isModelSlimmable() const { return mModelSlimmable.load(); }
+
     juce::AudioProcessorValueTreeState apvts;
 
     // Parameter IDs (single source of truth, shared with the editor).
@@ -72,6 +78,7 @@ public:
         static constexpr auto gateThresh   = "gate_threshold";
         static constexpr auto gateActive   = "gate_active";
         static constexpr auto irActive     = "ir_active";
+        static constexpr auto quality      = "quality";        // A2 slimmable size
 
         static constexpr auto hpfFreq      = "hpf_freq";
         static constexpr auto hpfActive    = "hpf_active";
@@ -93,12 +100,20 @@ private:
     float computeOutputGain() const;
     void  updateLatency();
 
+    // A2 quality control: applied off the audio thread (SetSlimmableSize is not
+    // real-time safe). Parameter changes trigger an async update on the message
+    // thread, which calls applyQuality().
+    void parameterChanged (const juce::String& parameterID, float newValue) override;
+    void handleAsyncUpdate() override;
+    void applyQuality();
+
     // ----- NAM model (staged-swap, lock-free on the audio thread) -----------
     std::unique_ptr<ResamplingNAM> mModel;
     std::unique_ptr<ResamplingNAM> mStagedModel;
     juce::SpinLock                 mModelSwapLock;
     juce::String                   mModelName;
     std::atomic<bool>              mClearModel { false };
+    std::atomic<bool>              mModelSlimmable { false };
 
     // ----- Cab IR ------------------------------------------------------------
     std::unique_ptr<dsp::ImpulseResponse> mIR;

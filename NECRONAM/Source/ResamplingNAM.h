@@ -16,6 +16,7 @@
 #include <memory>
 
 #include "NAM/dsp.h"
+#include "NAM/slimmable.h"
 #include "dsp/ResamplingContainer/ResamplingContainer.h"
 
 class ResamplingNAM
@@ -89,6 +90,23 @@ public:
     bool   HasOutputLevel() const      { return mEncapsulated && mEncapsulated->HasOutputLevel(); }
     double GetOutputLevel() const      { return mEncapsulated->GetOutputLevel(); }
     double GetExpectedSampleRate() const { return mExpectedSampleRate; }
+
+    // ----- A2 "slimmable" quality / efficiency control -----------------------
+    // Returns nullptr for non-slimmable (A1) models. SetSlimmableSize is
+    // thread-safe but NOT real-time safe, so callers must drive it from the
+    // message thread, never from processBlock.
+    nam::SlimmableModel* GetSlimmableModel()
+    {
+        return dynamic_cast<nam::SlimmableModel*> (mEncapsulated.get());
+    }
+    bool IsSlimmable() { return GetSlimmableModel() != nullptr; }
+
+    // size: 0 = max efficiency (lite) .. 1 = max quality (full). No-op for A1.
+    void SetQuality (double size)
+    {
+        if (auto* s = GetSlimmableModel())
+            s->SetSlimmableSize (size);
+    }
 
 private:
     std::unique_ptr<nam::DSP> mEncapsulated;

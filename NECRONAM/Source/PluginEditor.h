@@ -42,6 +42,9 @@ private:
     juce::ComboBox   outputModeBox;
     std::unique_ptr<ComboAttach> outputModeAttach;
 
+    // A2 quality / efficiency slider.
+    juce::Slider qualitySlider;
+
     // Owned widgets (knobs / sliders / toggles) and their labels + attachments.
     std::vector<std::unique_ptr<juce::Slider>>     sliders;
     std::vector<std::unique_ptr<juce::Label>>      labels;
@@ -67,6 +70,7 @@ private:
 
     // Section rectangles (filled in resized(), painted in paint()).
     juce::Rectangle<int> ampArea, cabArea, filterArea, eqArea, satArea;
+    juce::Rectangle<int> qualityLabelArea;
 
     std::unique_ptr<juce::FileChooser> chooser;
 

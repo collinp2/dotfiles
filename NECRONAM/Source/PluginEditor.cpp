@@ -41,6 +41,14 @@ NecronamAudioProcessorEditor::NecronamAudioProcessorEditor (NecronamAudioProcess
                                                       NecronamAudioProcessor::ParamID::outputMode,
                                                       outputModeBox);
 
+    // A2 quality / efficiency slider (horizontal, max efficiency .. max quality).
+    qualitySlider.setSliderStyle (juce::Slider::LinearHorizontal);
+    qualitySlider.setTextBoxStyle (juce::Slider::TextBoxRight, false, 96, 16);
+    qualitySlider.setColour (juce::Slider::textBoxTextColourId, c (COL_BONE));
+    addAndMakeVisible (qualitySlider);
+    sliderAttachments.push_back (std::make_unique<SliderAttach> (
+        processor.apvts, NecronamAudioProcessor::ParamID::quality, qualitySlider));
+
     using ID = NecronamAudioProcessor::ParamID;
 
     // ---- Knobs ----
@@ -78,7 +86,7 @@ NecronamAudioProcessorEditor::NecronamAudioProcessorEditor (NecronamAudioProcess
                 &addKnob (juce::String (bandIds[b]) + "_" + stageIds[s], stageNm[s]);
 
     startTimerHz (5);
-    setSize (1000, 780);
+    setSize (1000, 800);
 }
 
 NecronamAudioProcessorEditor::~NecronamAudioProcessorEditor()
@@ -169,6 +177,15 @@ void NecronamAudioProcessorEditor::timerCallback()
     modelNameLabel.setText (m.isEmpty() ? "(no model)" : m, juce::dontSendNotification);
     const auto ir = processor.getLoadedIRName();
     irNameLabel.setText (ir.isEmpty() ? "(no IR)" : ir, juce::dontSendNotification);
+
+    // The quality slider only does anything for A2 (slimmable) models.
+    const bool slim = processor.isModelSlimmable();
+    if (qualitySlider.isEnabled() != slim)
+    {
+        qualitySlider.setEnabled (slim);
+        qualitySlider.setAlpha (slim ? 1.0f : 0.45f);
+        repaint (qualityLabelArea);
+    }
 }
 
 // ===========================================================================
@@ -223,6 +240,19 @@ void NecronamAudioProcessorEditor::paint (juce::Graphics& g)
             g.drawText (names[b], s.removeFromLeft (cw).removeFromTop (14), juce::Justification::centred);
     }
 
+    // Quality slider hints: MAX EFFICIENCY <- ... -> MAX QUALITY.
+    if (! qualityLabelArea.isEmpty())
+    {
+        const auto track = qualityLabelArea.withTrimmedRight (96);   // exclude value box
+        const bool slim = processor.isModelSlimmable();
+        g.setFont (monoFont (9.0f));
+        g.setColour (c (COL_BONE_DIM));
+        g.drawText ("MAX EFFICIENCY", track, juce::Justification::centredLeft);
+        g.drawText ("MAX QUALITY",    track, juce::Justification::centredRight);
+        g.setColour (slim ? c (COL_BLOOD_BRIGHT) : c (COL_BONE_DIM));
+        g.drawText (slim ? "QUALITY (A2)" : "QUALITY (A1 - fixed)", track, juce::Justification::centred);
+    }
+
     // Footer.
     g.setColour (c (COL_BONE_DIM));
     g.setFont (monoFont (10.0f));
@@ -242,7 +272,7 @@ void NecronamAudioProcessorEditor::resized()
     area.reduce (12, 8);
 
     // ---- Row 1: AMP | (CAB over FILTERS) ----
-    auto row1 = area.removeFromTop (252);
+    auto row1 = area.removeFromTop (268);
     ampArea = row1.removeFromLeft (380);
     row1.removeFromLeft (12);
     cabArea = row1.removeFromTop (74);
@@ -283,6 +313,10 @@ void NecronamAudioProcessorEditor::resized()
         outputModeBox.setBounds (modeRow.removeFromLeft (160));
         modeRow.removeFromLeft (10);
         gateToggle->setBounds (modeRow.removeFromLeft (74));
+
+        a.removeFromTop (8);
+        qualityLabelArea = a.removeFromTop (14);          // painted hints
+        qualitySlider.setBounds (a.removeFromTop (26));
     }
 
     // ===== CAB contents =====

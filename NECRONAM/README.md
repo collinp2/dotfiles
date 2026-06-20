@@ -73,6 +73,20 @@ on, the VST3/AU are copied into your user plug-in folders automatically.
 | `Source/Saturation.h` | Flesh Render multiband saturator (verbatim waveshaping) |
 | `Source/HorrorLookAndFeel.*` | VoidCraft blood/bone theme |
 
+## Quality / efficiency (NAM A2)
+
+NAM **Architecture 2 (A2)** models are *slimmable*: a single model can trade
+CPU for fidelity at runtime. The **Quality** slider drives
+`nam::SlimmableModel::SetSlimmableSize(0..1)`:
+
+- **far right = Max Quality** ("full" model) — the default.
+- **far left = Max Efficiency** ("lite" model) — lowest CPU.
+
+`SetSlimmableSize` is thread-safe but **not** real-time safe, so slider moves
+are applied on the message thread (via an `AsyncUpdater`), never in
+`processBlock`. Older **A1** models aren't slimmable; for those the slider is
+disabled and labelled accordingly.
+
 ## Output modes
 
 - **Raw** — output gain only.

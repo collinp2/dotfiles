@@ -96,6 +96,29 @@ void HorrorLookAndFeel::drawLinearSlider (juce::Graphics& g, int x, int y, int w
                                           float sliderPos, float, float,
                                           juce::Slider::SliderStyle style, juce::Slider& slider)
 {
+    if (style == juce::Slider::LinearHorizontal)
+    {
+        const float cy = (float) y + height * 0.5f;
+        const juce::Rectangle<float> track ((float) x, cy - 2.0f, (float) width, 4.0f);
+        g.setColour (c (COL_KNOB_SHADOW));
+        g.fillRoundedRectangle (track, 2.0f);
+        g.setColour (c (COL_PANEL_BORDER).withAlpha (0.6f));
+        g.drawRoundedRectangle (track, 2.0f, 1.0f);
+
+        // Filled portion from the left to the thumb.
+        g.setColour (c (COL_BLOOD).withAlpha (0.55f));
+        g.fillRect (juce::Rectangle<float> ((float) x, cy - 2.0f, sliderPos - (float) x, 4.0f));
+
+        // Thumb.
+        const auto thumb = juce::Rectangle<float> (8.0f, (float) height * 0.7f)
+                               .withCentre ({ sliderPos, cy });
+        g.setColour (c (COL_KNOB_BODY));
+        g.fillRoundedRectangle (thumb, 2.0f);
+        g.setColour (slider.isEnabled() ? c (COL_BLOOD_BRIGHT) : c (COL_BONE_DIM));
+        g.drawRoundedRectangle (thumb, 2.0f, 1.2f);
+        return;
+    }
+
     if (style != juce::Slider::LinearVertical)
     {
         LookAndFeel_V4::drawLinearSlider (g, x, y, width, height, sliderPos, 0, 0, style, slider);
