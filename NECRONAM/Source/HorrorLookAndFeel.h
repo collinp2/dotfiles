@@ -25,6 +25,9 @@ namespace horror
     // Light bone tone for text/marks drawn on top of dark blood fills.
     inline constexpr juce::uint32 COL_BONE_LIGHT   = 0xFFF7F5F0;
 
+    // Neutral grey for marble veins in the parchment background texture.
+    inline constexpr juce::uint32 COL_VEIN         = 0xFF6C6864;
+
     inline juce::Colour c (juce::uint32 argb) { return juce::Colour (argb); }
 }
 

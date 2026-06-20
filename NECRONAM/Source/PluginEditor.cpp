@@ -221,34 +221,38 @@ void NecronamAudioProcessorEditor::buildBackground()
 
     juce::Random rng (0x804E04);
 
-    // Soft mottled staining (low-frequency blobs).
-    for (int i = 0; i < (w * h) / 1400; ++i)
+    // Soft mottled staining (low-frequency blobs) — grey, rust and bone.
+    for (int i = 0; i < (w * h) / 1200; ++i)
     {
         const float x = rng.nextFloat() * w;
         const float y = rng.nextFloat() * h;
         const float r = 18.0f + rng.nextFloat() * 130.0f;
-        auto col = rng.nextBool() ? c (COL_RUST) : c (COL_BONE_DIM);
-        g.setColour (col.withAlpha (0.02f + rng.nextFloat() * 0.04f));
+        const int pick = rng.nextInt (3);
+        auto col = pick == 0 ? c (COL_VEIN) : (pick == 1 ? c (COL_RUST) : c (COL_BONE_DIM));
+        g.setColour (col.withAlpha (0.03f + rng.nextFloat() * 0.05f));
         g.fillEllipse (x - r, y - r, r * 2.0f, r * 2.0f);
     }
 
-    // Marble veins (meandering quadratic strokes).
-    for (int i = 0; i < (w + h) / 16; ++i)
+    // Marble veins (meandering quadratic strokes) — greyer and more pronounced.
+    for (int i = 0; i < (w + h) / 9; ++i)
     {
         juce::Path p;
         float x = rng.nextFloat() * w, y = rng.nextFloat() * h;
         p.startNewSubPath (x, y);
-        const int segs = 3 + rng.nextInt (4);
+        const int segs = 4 + rng.nextInt (5);
         for (int s = 0; s < segs; ++s)
         {
-            const float nx = x + rng.nextFloat() * 150.0f - 75.0f;
-            const float ny = y + rng.nextFloat() * 150.0f - 75.0f;
-            p.quadraticTo ((x + nx) * 0.5f + rng.nextFloat() * 40.0f - 20.0f,
-                           (y + ny) * 0.5f + rng.nextFloat() * 40.0f - 20.0f, nx, ny);
+            const float nx = x + rng.nextFloat() * 170.0f - 85.0f;
+            const float ny = y + rng.nextFloat() * 170.0f - 85.0f;
+            p.quadraticTo ((x + nx) * 0.5f + rng.nextFloat() * 50.0f - 25.0f,
+                           (y + ny) * 0.5f + rng.nextFloat() * 50.0f - 25.0f, nx, ny);
             x = nx; y = ny;
         }
-        g.setColour (c (COL_BONE_DIM).withAlpha (0.04f + rng.nextFloat() * 0.05f));
-        g.strokePath (p, juce::PathStrokeType (0.8f + rng.nextFloat() * 0.9f));
+        // Soft wide vein underlay + a darker hairline core for marble depth.
+        g.setColour (c (COL_VEIN).withAlpha (0.10f + rng.nextFloat() * 0.10f));
+        g.strokePath (p, juce::PathStrokeType (1.6f + rng.nextFloat() * 1.8f));
+        g.setColour (c (COL_VEIN).darker (0.5f).withAlpha (0.12f + rng.nextFloat() * 0.10f));
+        g.strokePath (p, juce::PathStrokeType (0.6f + rng.nextFloat() * 0.5f));
     }
 
     // Fine flecks on top.
