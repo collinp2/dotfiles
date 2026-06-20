@@ -49,9 +49,13 @@ void HorrorLookAndFeel::drawRotarySlider (juce::Graphics& g, int x, int y, int w
                                           float sliderPos, float rotaryStartAngle, float rotaryEndAngle,
                                           juce::Slider&)
 {
-    const auto bounds = juce::Rectangle<int> (x, y, width, height).toFloat().reduced (4.0f);
+    // Use a centred square so the knob is always circular, never oval, even
+    // when the slider's bounds aren't square.
+    const auto area  = juce::Rectangle<int> (x, y, width, height).toFloat();
+    const float side = juce::jmin (area.getWidth(), area.getHeight()) - 8.0f;
+    const auto bounds = juce::Rectangle<float> (side, side).withCentre (area.getCentre());
     const auto centre = bounds.getCentre();
-    const float radius = juce::jmin (bounds.getWidth(), bounds.getHeight()) * 0.5f;
+    const float radius = side * 0.5f;
     const float angle  = rotaryStartAngle + sliderPos * (rotaryEndAngle - rotaryStartAngle);
 
     // Drop shadow.

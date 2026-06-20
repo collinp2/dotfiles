@@ -4,11 +4,37 @@
 #include <filesystem>
 
 #include "NAM/get_dsp.h"
+#include "NAM/model_config.h"
+#include "NAM/wavenet/model.h"
+#include "NAM/convnet.h"
+#include "NAM/lstm.h"
+#include "NAM/linear.h"
+#include "NAM/container.h"
 
 using APVTS = juce::AudioProcessorValueTreeState;
 
 namespace
 {
+    // NAM architectures self-register via anonymous static objects, which get
+    // dead-stripped when the core is linked through JUCE's SharedCode static
+    // library. Register them explicitly (also references the symbols so their
+    // translation units aren't dropped). Without this, get_dsp() throws and
+    // the model never loads.
+    void ensureNamArchitecturesRegistered()
+    {
+        static const bool done = []
+        {
+            auto& reg = nam::ConfigParserRegistry::instance();
+            reg.registerParser ("WaveNet",            nam::wavenet::create_config);
+            reg.registerParser ("ConvNet",            nam::convnet::create_config);
+            reg.registerParser ("LSTM",               nam::lstm::create_config);
+            reg.registerParser ("Linear",             nam::linear::create_config);
+            reg.registerParser ("SlimmableContainer", nam::container::create_config);
+            return true;
+        }();
+        juce::ignoreUnused (done);
+    }
+
     float blockPeak (const float* x, int n)
     {
         float m = 0.0f;
@@ -364,12 +390,16 @@ void NecronamAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juc
 // ===========================================================================
 void NecronamAudioProcessor::loadNamModel (const juce::File& file)
 {
+    ensureNamArchitecturesRegistered();
     try
     {
         const auto p = std::filesystem::u8path (file.getFullPathName().toStdString());
         std::unique_ptr<nam::DSP> dsp = nam::get_dsp (p);
         if (dsp == nullptr)
+        {
+            mModelName = "LOAD FAILED (null)";
             return;
+        }
 
         auto wrapped = std::make_unique<ResamplingNAM> (std::move (dsp));
         if (mPrepared.load())
@@ -391,6 +421,7 @@ void NecronamAudioProcessor::loadNamModel (const juce::File& file)
     }
     catch (const std::exception& e)
     {
+        mModelName = "LOAD FAILED";
         juce::Logger::writeToLog (juce::String ("NECRONAM: failed to load model: ") + e.what());
     }
 }

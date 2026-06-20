@@ -46,7 +46,9 @@ endif()
 set(NAM_DIR  "${nam_core_SOURCE_DIR}")
 set(NAM_DEPS "${NAM_DIR}/Dependencies")
 
-file(GLOB NAM_CORE_SOURCES "${NAM_DIR}/NAM/*.cpp")
+file(GLOB NAM_CORE_SOURCES
+    "${NAM_DIR}/NAM/*.cpp"
+    "${NAM_DIR}/NAM/wavenet/*.cpp")
 
 if(NOT NAM_CORE_SOURCES)
     message(FATAL_ERROR
