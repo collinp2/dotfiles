@@ -67,6 +67,15 @@ endif()
 # ----------------------------------------------------------------------------
 # Plugin target
 # ----------------------------------------------------------------------------
+# Install system-wide on macOS (/Library) instead of the per-user folder.
+# Guarded so non-macOS builds keep the default (per-user) copy location.
+set(NECRONAM_COPY_ARGS COPY_PLUGIN_AFTER_BUILD TRUE)
+if(APPLE)
+    list(APPEND NECRONAM_COPY_ARGS
+        VST3_COPY_DIR "/Library/Audio/Plug-Ins/VST3"
+        AU_COPY_DIR   "/Library/Audio/Plug-Ins/Components")
+endif()
+
 juce_add_plugin(NECRONAM
     PRODUCT_NAME              "NECRONAM"
     COMPANY_NAME             "CP Software"
@@ -80,7 +89,7 @@ juce_add_plugin(NECRONAM
     NEEDS_MIDI_OUTPUT         FALSE
     IS_MIDI_EFFECT            FALSE
     EDITOR_WANTS_KEYBOARD_FOCUS FALSE
-    COPY_PLUGIN_AFTER_BUILD   TRUE
+    ${NECRONAM_COPY_ARGS}
     VST3_CATEGORIES           "Fx" "Distortion"
     AU_MAIN_TYPE              "kAudioUnitType_Effect"
 )
