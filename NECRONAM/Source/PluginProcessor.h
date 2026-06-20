@@ -1,0 +1,131 @@
+#pragma once
+
+#include <atomic>
+#include <memory>
+
+#include <juce_audio_processors/juce_audio_processors.h>
+#include <juce_dsp/juce_dsp.h>
+
+#include "ResamplingNAM.h"
+#include "Api560EQ.h"
+#include "Saturation.h"
+
+// AudioDSPTools blocks reused straight from the NAM ecosystem.
+#include "dsp/NoiseGate.h"
+#include "dsp/ImpulseResponse.h"
+#include "dsp/RecursiveLinearFilter.h"
+#include "dsp/wav.h"
+
+// ============================================================================
+//  NECRONAM  —  AudioProcessor
+//  Signal chain:
+//    input gain -> noise gate -> NAM model -> gate gain -> cab IR
+//    -> DC blocker -> API-560 EQ -> saturation -> HPF -> LPF -> output
+// ============================================================================
+class NecronamAudioProcessor : public juce::AudioProcessor
+{
+public:
+    NecronamAudioProcessor();
+    ~NecronamAudioProcessor() override;
+
+    void prepareToPlay (double sampleRate, int samplesPerBlock) override;
+    void releaseResources() override {}
+    bool isBusesLayoutSupported (const BusesLayout&) const override;
+    void processBlock (juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
+
+    juce::AudioProcessorEditor* createEditor() override;
+    bool hasEditor() const override { return true; }
+
+    const juce::String getName() const override { return "NECRONAM"; }
+    bool acceptsMidi() const override  { return false; }
+    bool producesMidi() const override { return false; }
+    bool isMidiEffect() const override { return false; }
+    double getTailLengthSeconds() const override { return 0.0; }
+
+    int getNumPrograms() override { return 1; }
+    int getCurrentProgram() override { return 0; }
+    void setCurrentProgram (int) override {}
+    const juce::String getProgramName (int) override { return {}; }
+    void changeProgramName (int, const juce::String&) override {}
+
+    void getStateInformation (juce::MemoryBlock&) override;
+    void setStateInformation (const void*, int sizeInBytes) override;
+
+    // ----- Model / IR management (called from the message thread) -----------
+    void loadNamModel (const juce::File&);
+    void clearNamModel();
+    void loadImpulseResponse (const juce::File&);
+    void clearImpulseResponse();
+
+    juce::String getLoadedModelName() const { return mModelName; }
+    juce::String getLoadedIRName()    const { return mIRName;    }
+
+    juce::AudioProcessorValueTreeState apvts;
+
+    // Parameter IDs (single source of truth, shared with the editor).
+    struct ParamID
+    {
+        static constexpr auto inputLevel   = "input_level";
+        static constexpr auto outputLevel  = "output_level";
+        static constexpr auto outputMode   = "output_mode";
+        static constexpr auto inputCal     = "input_cal";
+        static constexpr auto gateThresh   = "gate_threshold";
+        static constexpr auto gateActive   = "gate_active";
+        static constexpr auto irActive     = "ir_active";
+
+        static constexpr auto hpfFreq      = "hpf_freq";
+        static constexpr auto hpfActive    = "hpf_active";
+        static constexpr auto lpfFreq      = "lpf_freq";
+        static constexpr auto lpfActive    = "lpf_active";
+
+        static constexpr auto eqActive     = "eq_active";
+        // eq_0 .. eq_9 generated for the ten bands.
+
+        static constexpr auto satActive    = "sat_active";
+        // {low,mid,high}_{sat,dist,fuzz} generated for the saturator.
+    };
+
+    static juce::String eqParamID (int band) { return "eq_" + juce::String (band); }
+
+private:
+    juce::AudioProcessorValueTreeState::ParameterLayout createLayout();
+
+    float computeOutputGain() const;
+    void  updateLatency();
+
+    // ----- NAM model (staged-swap, lock-free on the audio thread) -----------
+    std::unique_ptr<ResamplingNAM> mModel;
+    std::unique_ptr<ResamplingNAM> mStagedModel;
+    juce::SpinLock                 mModelSwapLock;
+    juce::String                   mModelName;
+    std::atomic<bool>              mClearModel { false };
+
+    // ----- Cab IR ------------------------------------------------------------
+    std::unique_ptr<dsp::ImpulseResponse> mIR;
+    std::unique_ptr<dsp::ImpulseResponse> mStagedIR;
+    juce::SpinLock                        mIRSwapLock;
+    juce::String                          mIRName;
+    std::atomic<bool>                     mClearIR { false };
+
+    // ----- Fixed DSP blocks --------------------------------------------------
+    dsp::noise_gate::Trigger          mNoiseGateTrigger;
+    dsp::noise_gate::Gain             mNoiseGateGain;
+    recursive_linear_filter::HighPass mDCBlocker;          // ~5 Hz, always on
+    Api560EQ                          mEQ;
+    Saturation                        mSaturation;
+    juce::dsp::IIR::Filter<float>     mHPF;                 // user hi-pass
+    juce::dsp::IIR::Filter<float>     mLPF;                 // user low-pass
+    float mHpfCachedFreq = -1.0f;
+    float mLpfCachedFreq = -1.0f;
+
+    // ----- Scratch buffers ---------------------------------------------------
+    juce::AudioBuffer<float> mMonoBuffer;     // summed mono working buffer
+    juce::AudioBuffer<float> mModelOutBuffer; // NAM model output
+
+    double mSampleRate = 44100.0;
+    int    mMaxBlock   = 512;
+
+    std::atomic<bool> mPrepared { false };
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (NecronamAudioProcessor)
+};
