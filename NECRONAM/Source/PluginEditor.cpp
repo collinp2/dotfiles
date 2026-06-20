@@ -270,21 +270,19 @@ void NecronamAudioProcessorEditor::resized()
         loadRow.removeFromRight (6);
         modelNameLabel.setBounds (loadRow);
 
-        a.removeFromTop (20);                 // room for knob labels
-        auto knobRow = a.removeFromTop (98);
-        const int kw = knobRow.getWidth() / 3;
-        inputKnob->setBounds  (knobRow.removeFromLeft (kw).reduced (6));
-        gateKnob->setBounds   (knobRow.removeFromLeft (kw).reduced (6));
-        outputKnob->setBounds (knobRow.reduced (6));
+        a.removeFromTop (18);                 // room for knob labels
+        auto knobRow = a.removeFromTop (94);
+        const int kw = knobRow.getWidth() / 4;
+        inputKnob->setBounds    (knobRow.removeFromLeft (kw).reduced (5));
+        gateKnob->setBounds     (knobRow.removeFromLeft (kw).reduced (5));
+        outputKnob->setBounds   (knobRow.removeFromLeft (kw).reduced (5));
+        inputCalKnob->setBounds (knobRow.reduced (5));
 
-        a.removeFromTop (6);
+        a.removeFromTop (8);
         auto modeRow = a.removeFromTop (26);
         outputModeBox.setBounds (modeRow.removeFromLeft (160));
         modeRow.removeFromLeft (10);
         gateToggle->setBounds (modeRow.removeFromLeft (74));
-
-        a.removeFromTop (18);                 // room for label
-        inputCalKnob->setBounds (a.removeFromTop (70).removeFromLeft (kw).reduced (6));
     }
 
     // ===== CAB contents =====
