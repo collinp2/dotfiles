@@ -266,12 +266,13 @@ void NecronamAudioProcessorEditor::paint (juce::Graphics& g)
     {
         const auto track = qualityLabelArea.withTrimmedRight (96);   // exclude value box
         const bool slim = processor.isModelSlimmable();
+        const float dim = slim ? 1.0f : 0.4f;    // grey the whole section for A1
         g.setFont (monoFont (9.0f));
-        g.setColour (c (COL_BONE_DIM));
+        g.setColour (c (COL_BONE_DIM).withAlpha (dim));
         g.drawText ("MAX EFFICIENCY", track, juce::Justification::centredLeft);
         g.drawText ("MAX QUALITY",    track, juce::Justification::centredRight);
-        g.setColour (slim ? c (COL_BLOOD_BRIGHT) : c (COL_BONE_DIM));
-        g.drawText (slim ? "QUALITY (A2)" : "QUALITY (A1 - fixed)", track, juce::Justification::centred);
+        g.setColour (slim ? c (COL_BLOOD_BRIGHT) : c (COL_BONE_DIM).withAlpha (dim));
+        g.drawText (slim ? "QUALITY (A2)" : "QUALITY (A1 - FIXED)", track, juce::Justification::centred);
     }
 
     // Footer.
