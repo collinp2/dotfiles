@@ -1,5 +1,13 @@
 cmake_minimum_required(VERSION 3.21)
 
+# Build a universal binary on macOS (arm64 + x86_64) so hosts that run x86_64 —
+# notably Adobe Premiere Pro / its audio plug-in scanner under Rosetta — can
+# load the plugin. Set before project() so the toolchain and all FetchContent
+# dependencies build for both slices. Override with -DCMAKE_OSX_ARCHITECTURES.
+if(CMAKE_HOST_APPLE AND NOT DEFINED CMAKE_OSX_ARCHITECTURES)
+    set(CMAKE_OSX_ARCHITECTURES "arm64;x86_64" CACHE STRING "macOS universal build")
+endif()
+
 # ============================================================================
 #  NECRONAM  —  Neural Amp Necromancy
 #  A Neural Amp Modeler (NAM) capture player with cab IR, API-560 style
