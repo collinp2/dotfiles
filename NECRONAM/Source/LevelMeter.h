@@ -1,7 +1,7 @@
 #pragma once
 
 // ============================================================================
-//  LevelMeter  —  peak meter with peak-hold, in the VoidCraft horror palette.
+//  LevelMeter  —  peak meter with peak-hold, in the CP Software horror palette.
 //  Driven from the editor timer via update(linearPeak): instant attack, smooth
 //  release. Draws an optional caption along the bottom.
 // ============================================================================

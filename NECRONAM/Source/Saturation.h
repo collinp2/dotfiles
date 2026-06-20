@@ -1,7 +1,7 @@
 #pragma once
 
 // ============================================================================
-//  Saturation  —  ported from VoidCraft Audio "Flesh Render"
+//  Saturation  —  ported from CP Software "Flesh Render"
 //  Three-band multiband saturator. Linkwitz-Riley 4th-order crossovers at
 //  250 Hz and 2 kHz split the signal; each band runs the same
 //  saturation -> distortion -> fuzz waveshaping chain, then the bands are

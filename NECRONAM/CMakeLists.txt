@@ -12,7 +12,7 @@ endif()
 #  NECRONAM  —  Neural Amp Necromancy
 #  A Neural Amp Modeler (NAM) capture player with cab IR, API-560 style
 #  graphic EQ, hi/low-pass filters and the Flesh Render multiband saturator.
-#  VoidCraft Audio. JUCE + NeuralAmpModelerCore.
+#  CP Software. JUCE + NeuralAmpModelerCore.
 # ============================================================================
 
 project(NECRONAM VERSION 1.0.0 LANGUAGES C CXX)
@@ -69,10 +69,10 @@ endif()
 # ----------------------------------------------------------------------------
 juce_add_plugin(NECRONAM
     PRODUCT_NAME              "NECRONAM"
-    COMPANY_NAME             "VoidCraft Audio"
-    BUNDLE_ID                "com.voidcraftaudio.necronam"
+    COMPANY_NAME             "CP Software"
+    BUNDLE_ID                "com.cpsoftware.necronam"
     DESCRIPTION              "Neural Amp Necromancy — NAM player, IR, EQ & Saturation"
-    PLUGIN_MANUFACTURER_CODE  Void
+    PLUGIN_MANUFACTURER_CODE  Cpsw
     PLUGIN_CODE               Ncnm
     FORMATS                   VST3 AU Standalone
     IS_SYNTH                  FALSE

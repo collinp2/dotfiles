@@ -5,14 +5,14 @@
 > Preview is a static mockup rendered from the editor's layout + theme, not a
 > screenshot of a running build.
 
-A horror-themed **Neural Amp Modeler (NAM) capture player** by VoidCraft Audio,
+A horror-themed **Neural Amp Modeler (NAM) capture player** by CP Software,
 built with JUCE. It does everything the official NAM ("gateway") plugin does —
 loads `.nam` captures, runs a noise gate, loads cab impulse responses, and
 handles output calibration — then adds a **post chain**: an **API-560 style
 graphic EQ**, **hi-pass / low-pass filters**, and the **Flesh Render multiband
 saturator** (saturation / distortion / fuzz).
 
-Built to share the visual language of the existing VoidCraft horror line
+Built to share the visual language of the existing CP Software horror line
 (Flesh Render): blood-red / bone palette, claw-tick knobs, grain + blood-drip
 decoration.
 
@@ -74,7 +74,7 @@ cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --config Release
 ```
 
-On **macOS 15** JUCE is pinned to the `develop` branch (per the VoidCraft build
+On **macOS 15** JUCE is pinned to the `develop` branch (per the CP Software build
 notes) to avoid removed-API issues.
 
 Formats built: **VST3**, **AU**, **Standalone**. With `COPY_PLUGIN_AFTER_BUILD`
@@ -90,7 +90,7 @@ on, the VST3/AU are copied into your user plug-in folders automatically.
 | `Source/ResamplingNAM.h` | Wraps `nam::DSP` with on-demand sample-rate conversion |
 | `Source/Api560EQ.h` | 10-band, octave-spaced, proportional-Q graphic EQ |
 | `Source/Saturation.h` | Flesh Render multiband saturator (verbatim waveshaping) |
-| `Source/HorrorLookAndFeel.*` | VoidCraft blood/bone theme |
+| `Source/HorrorLookAndFeel.*` | CP Software blood/bone theme |
 
 ## Quality / efficiency (NAM A2)
 
@@ -120,5 +120,5 @@ disabled and labelled accordingly.
   (`sdatkinson/NeuralAmpModelerCore`, `NeuralAmpModelerPlugin`), MIT.
 - AudioDSPTools (noise gate, IR convolution, resampler, filters) —
   `sdatkinson/AudioDSPTools`.
-- Saturation DSP & horror theme — VoidCraft Audio "Flesh Render".
+- Saturation DSP & horror theme — CP Software "Flesh Render".
 - Framework — JUCE.

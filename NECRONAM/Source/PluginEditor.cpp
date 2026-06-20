@@ -178,7 +178,15 @@ juce::TextButton& NecronamAudioProcessorEditor::addToggle (const juce::String& p
 
 void NecronamAudioProcessorEditor::chooseFile (bool isModel)
 {
-    const auto dir = juce::File::getSpecialLocation (juce::File::userHomeDirectory);
+    // Start in the folder of the last-loaded file (persisted in state), so the
+    // picker remembers where you were; fall back to the home folder.
+    juce::File dir;
+    const auto last = processor.apvts.state.getProperty (isModel ? "namPath" : "irPath").toString();
+    if (last.isNotEmpty())
+        dir = juce::File (last).getParentDirectory();
+    if (! dir.isDirectory())
+        dir = juce::File::getSpecialLocation (juce::File::userHomeDirectory);
+
     chooser = std::make_unique<juce::FileChooser> (
         isModel ? "Select a NAM model (.nam)" : "Select an impulse response (.wav)",
         dir, isModel ? "*.nam" : "*.wav");
@@ -294,17 +302,18 @@ void NecronamAudioProcessorEditor::paint (juce::Graphics& g)
         g.drawText ("OUTPUT MODE", lbl, juce::Justification::centred);
     }
 
-    // Saturation band labels.
+    // Saturation band labels — sit in their own row above the knob labels.
     if (! satArea.isEmpty())
     {
-        auto s = satArea.reduced (12);
-        s.removeFromTop (26 + 16);
+        auto s = satArea.reduced (14);
+        s.removeFromTop (24);                   // section-title row
+        auto bandRow = s.removeFromTop (16);    // matches the gap reserved in resized()
         const char* names[3] = { "LOW", "MID", "HIGH" };
-        const int cw = s.getWidth() / 3;
+        const int cw = bandRow.getWidth() / 3;
         g.setColour (c (COL_BLOOD));
         g.setFont (monoFont (12.0f));
         for (int b = 0; b < 3; ++b)
-            g.drawText (names[b], s.removeFromLeft (cw).removeFromTop (14), juce::Justification::centred);
+            g.drawText (names[b], bandRow.removeFromLeft (cw), juce::Justification::centred);
     }
 
     // Quality slider hints: MAX EFFICIENCY <- ... -> MAX QUALITY.
@@ -324,10 +333,10 @@ void NecronamAudioProcessorEditor::paint (juce::Graphics& g)
     // Footer.
     g.setColour (c (COL_BONE_DIM));
     g.setFont (monoFont (10.0f));
-    g.drawText ("VOIDCRAFT AUDIO  -  NECRONAM v1.0  -  NEURAL AMP NECROMANCY",
+    g.drawText ("CP SOFTWARE  -  NECRONAM v1.0  -  NEURAL AMP NECROMANCY",
                 juce::Rectangle<int> (0, getHeight() - 26, w, 22), juce::Justification::centred);
 
-    // Grain overlay (original VoidCraft texture).
+    // Grain overlay (original CP Software texture).
     HorrorLookAndFeel::drawGrainTexture (g, getLocalBounds());
 }
 
@@ -461,7 +470,8 @@ void NecronamAudioProcessorEditor::resized()
         auto s = satArea.reduced (14);
         auto stop = s.removeFromTop (24);
         satToggle->setBounds (stop.removeFromRight (90));
-        s.removeFromTop (16 + 14);            // section + band-name room
+        s.removeFromTop (16);                 // band-name row (LOW/MID/HIGH)
+        s.removeFromTop (22);                 // gap so knob labels clear the band names
         const int cw = s.getWidth() / 3;
         for (int b = 0; b < 3; ++b)
         {

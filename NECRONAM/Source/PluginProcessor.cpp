@@ -107,7 +107,7 @@ APVTS::ParameterLayout NecronamAudioProcessor::createLayout()
     params.push_back (fParam (ParamID::outputLevel, "Output Level", Range (-40.0f, 40.0f, 0.1f), 0.0f, dbToText));
     params.push_back (std::make_unique<juce::AudioParameterChoice> (
         juce::ParameterID { ParamID::outputMode, 1 }, "Output Mode",
-        juce::StringArray { "Raw", "Normalized", "Calibrated" }, 1));
+        juce::StringArray { "Raw", "Normalized", "Calibrated" }, 0));
     params.push_back (fParam (ParamID::inputCal, "Input Calibration", Range (0.0f, 30.0f, 0.1f), 12.0f,
                               [] (float v, int) { return juce::String (v, 1) + " dBu"; }));
     params.push_back (fParam (ParamID::gateThresh, "Gate Threshold", Range (-100.0f, 0.0f, 0.5f), -80.0f, dbToText));
