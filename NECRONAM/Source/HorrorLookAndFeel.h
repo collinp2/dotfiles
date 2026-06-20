@@ -4,29 +4,29 @@
 
 namespace horror
 {
-    // ----- High-Contrast "Gory Light Mode" Palette (Stained Bone & Arterial Blood) -----
-    inline constexpr juce::uint32 COL_BACKGROUND   = 0xFFF2EFE9; // Aged, dried bone surface
-    inline constexpr juce::uint32 COL_HEADER_BG    = 0xFFE5DEC9; // Heavily stained, darker bone tier
-    inline constexpr juce::uint32 COL_PANEL_BG     = 0xFFF7F5F0; // Bright bone white for high UI panel contrast
-    inline constexpr juce::uint32 COL_PANEL_BORDER = 0xFF501212; // Coagulated scab-red borders
+    // ----- Light "Stained Marble" palette, colour-matched to the reference image -----
+    inline constexpr juce::uint32 COL_BACKGROUND   = 0xFFE6E0D5; // Aged marble / parchment base
+    inline constexpr juce::uint32 COL_HEADER_BG    = 0xFFCEC3B8; // Darker stained marble (header tier)
+    inline constexpr juce::uint32 COL_PANEL_BG     = 0xFFEFEAE0; // Cleaner marble for panels
+    inline constexpr juce::uint32 COL_PANEL_BORDER = 0xFF3E110E; // Oxblood outline
 
-    inline constexpr juce::uint32 COL_BLOOD_DARK   = 0xFF4A0505; // Deep, oxidized scab red
-    inline constexpr juce::uint32 COL_BLOOD        = 0xFF9E0C0C; // Rich, arterial blood red
-    inline constexpr juce::uint32 COL_BLOOD_BRIGHT = 0xFFD60606; // Vivid, freshly spilled visceral red
+    inline constexpr juce::uint32 COL_BLOOD_DARK   = 0xFF330907; // Deep dried oxblood
+    inline constexpr juce::uint32 COL_BLOOD        = 0xFF4C0A08; // Oxidized blood red
+    inline constexpr juce::uint32 COL_BLOOD_BRIGHT = 0xFF5D0B09; // Brightest accent present (a muted brick)
 
-    inline constexpr juce::uint32 COL_BONE         = 0xFF2A1C1C; // Deep crimson-tinted near-black for readable text
-    inline constexpr juce::uint32 COL_BONE_DIM     = 0xFF6D5A5A; // Dried blood stain color for inactive text/markers
+    inline constexpr juce::uint32 COL_BONE         = 0xFF2A1612; // Near-black crimson for readable text
+    inline constexpr juce::uint32 COL_BONE_DIM     = 0xFF7A6A60; // Faded stain for inactive text/markers
 
-    inline constexpr juce::uint32 COL_KNOB_BODY    = 0xFF500A0A; // Clotted blood chunk knob body
-    inline constexpr juce::uint32 COL_KNOB_SHINE   = 0xFF851A1A; // Fresh wet shine on the knob cap
-    inline constexpr juce::uint32 COL_KNOB_SHADOW  = 0xFFD0C3B0; // Soft bone-tinted drop shadow (instead of black)
-    inline constexpr juce::uint32 COL_RUST         = 0xFF7D3C3C; // Dried flesh / rust accent
+    inline constexpr juce::uint32 COL_KNOB_BODY    = 0xFF3A0E0C; // Dark clotted knob body
+    inline constexpr juce::uint32 COL_KNOB_SHINE   = 0xFF6A2420; // Muted wet shine
+    inline constexpr juce::uint32 COL_KNOB_SHADOW  = 0xFFC9BCA9; // Soft marble-tinted drop shadow
+    inline constexpr juce::uint32 COL_RUST         = 0xFF7D5A50; // Dried flesh / rust accent
 
-    // Light bone tone for text/marks drawn on top of dark blood fills.
-    inline constexpr juce::uint32 COL_BONE_LIGHT   = 0xFFF7F5F0;
+    // Light tone for text/marks drawn on top of dark blood fills.
+    inline constexpr juce::uint32 COL_BONE_LIGHT   = 0xFFEFEAE0;
 
-    // Neutral grey for marble veins in the parchment background texture.
-    inline constexpr juce::uint32 COL_VEIN         = 0xFF6C6864;
+    // Warm grey for marble veins (matches reference vein tone).
+    inline constexpr juce::uint32 COL_VEIN         = 0xFFA09990;
 
     inline juce::Colour c (juce::uint32 argb) { return juce::Colour (argb); }
 }

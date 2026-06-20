@@ -1,4 +1,5 @@
 #include "PluginEditor.h"
+#include "BinaryData.h"
 
 using namespace horror;
 
@@ -211,52 +212,9 @@ void NecronamAudioProcessorEditor::timerCallback()
 // ===========================================================================
 void NecronamAudioProcessorEditor::buildBackground()
 {
-    const int w = getWidth(), h = getHeight();
-    if (w <= 0 || h <= 0)
-        return;
-
-    mBackground = juce::Image (juce::Image::RGB, w, h, false);
-    juce::Graphics g (mBackground);
-    g.fillAll (c (COL_BACKGROUND));
-
-    juce::Random rng (0x804E04);
-
-    // Soft mottled staining (low-frequency blobs) — grey, rust and bone.
-    for (int i = 0; i < (w * h) / 1200; ++i)
-    {
-        const float x = rng.nextFloat() * w;
-        const float y = rng.nextFloat() * h;
-        const float r = 18.0f + rng.nextFloat() * 130.0f;
-        const int pick = rng.nextInt (3);
-        auto col = pick == 0 ? c (COL_VEIN) : (pick == 1 ? c (COL_RUST) : c (COL_BONE_DIM));
-        g.setColour (col.withAlpha (0.03f + rng.nextFloat() * 0.05f));
-        g.fillEllipse (x - r, y - r, r * 2.0f, r * 2.0f);
-    }
-
-    // Marble veins (meandering quadratic strokes) — greyer and more pronounced.
-    for (int i = 0; i < (w + h) / 9; ++i)
-    {
-        juce::Path p;
-        float x = rng.nextFloat() * w, y = rng.nextFloat() * h;
-        p.startNewSubPath (x, y);
-        const int segs = 4 + rng.nextInt (5);
-        for (int s = 0; s < segs; ++s)
-        {
-            const float nx = x + rng.nextFloat() * 170.0f - 85.0f;
-            const float ny = y + rng.nextFloat() * 170.0f - 85.0f;
-            p.quadraticTo ((x + nx) * 0.5f + rng.nextFloat() * 50.0f - 25.0f,
-                           (y + ny) * 0.5f + rng.nextFloat() * 50.0f - 25.0f, nx, ny);
-            x = nx; y = ny;
-        }
-        // Soft wide vein underlay + a darker hairline core for marble depth.
-        g.setColour (c (COL_VEIN).withAlpha (0.10f + rng.nextFloat() * 0.10f));
-        g.strokePath (p, juce::PathStrokeType (1.6f + rng.nextFloat() * 1.8f));
-        g.setColour (c (COL_VEIN).darker (0.5f).withAlpha (0.12f + rng.nextFloat() * 0.10f));
-        g.strokePath (p, juce::PathStrokeType (0.6f + rng.nextFloat() * 0.5f));
-    }
-
-    // Fine flecks on top.
-    HorrorLookAndFeel::drawGrainTexture (g, mBackground.getBounds(), 0.05f);
+    // Embedded aged-marble texture (shared with the repo preview image).
+    mBackground = juce::ImageCache::getFromMemory (BinaryData::parchment_png,
+                                                   BinaryData::parchment_pngSize);
 }
 
 void NecronamAudioProcessorEditor::paint (juce::Graphics& g)
@@ -264,7 +222,8 @@ void NecronamAudioProcessorEditor::paint (juce::Graphics& g)
     const auto w = getWidth();
 
     if (mBackground.isValid())
-        g.drawImageAt (mBackground, 0, 0);
+        g.drawImage (mBackground, getLocalBounds().toFloat(),
+                     juce::RectanglePlacement::stretchToFit);
     else
         g.fillAll (c (COL_BACKGROUND));
 
@@ -370,9 +329,6 @@ void NecronamAudioProcessorEditor::paint (juce::Graphics& g)
     g.setFont (monoFont (10.0f));
     g.drawText ("VOIDCRAFT AUDIO  -  NECRONAM v1.0  -  NEURAL AMP NECROMANCY",
                 juce::Rectangle<int> (0, getHeight() - 26, w, 22), juce::Justification::centred);
-
-    // Grain overlay.
-    HorrorLookAndFeel::drawGrainTexture (g, getLocalBounds());
 }
 
 // ===========================================================================

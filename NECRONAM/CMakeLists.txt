@@ -80,6 +80,9 @@ juce_add_plugin(NECRONAM
 
 juce_generate_juce_header(NECRONAM)
 
+# Embedded assets (parchment/marble background texture).
+juce_add_binary_data(NecronamAssets SOURCES Resources/parchment.png)
+
 target_sources(NECRONAM PRIVATE
     Source/PluginProcessor.cpp
     Source/PluginEditor.cpp
@@ -113,6 +116,7 @@ target_include_directories(NECRONAM SYSTEM PRIVATE
 )
 
 target_link_libraries(NECRONAM PRIVATE
+    NecronamAssets
     juce::juce_audio_utils
     juce::juce_audio_processors
     juce::juce_dsp
