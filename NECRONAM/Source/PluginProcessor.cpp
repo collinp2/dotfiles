@@ -25,11 +25,21 @@ namespace
         static const bool done = []
         {
             auto& reg = nam::ConfigParserRegistry::instance();
-            reg.registerParser ("WaveNet",            nam::wavenet::create_config);
-            reg.registerParser ("ConvNet",            nam::convnet::create_config);
-            reg.registerParser ("LSTM",               nam::lstm::create_config);
-            reg.registerParser ("Linear",             nam::linear::create_config);
-            reg.registerParser ("SlimmableContainer", nam::container::create_config);
+            // Referencing create_config keeps each architecture's TU (and its
+            // self-registration static initializer) from being dead-stripped.
+            // If that static init already ran, registerParser throws "already
+            // registered" — which we tolerate, so we end up registered exactly
+            // once whether or not the strip happened.
+            auto tryReg = [&reg] (const char* name, nam::ConfigParserFunction fn)
+            {
+                try { reg.registerParser (name, std::move (fn)); }
+                catch (const std::exception&) { /* already self-registered */ }
+            };
+            tryReg ("WaveNet",            nam::wavenet::create_config);
+            tryReg ("ConvNet",            nam::convnet::create_config);
+            tryReg ("LSTM",               nam::lstm::create_config);
+            tryReg ("Linear",             nam::linear::create_config);
+            tryReg ("SlimmableContainer", nam::container::create_config);
             return true;
         }();
         juce::ignoreUnused (done);
