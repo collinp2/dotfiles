@@ -272,6 +272,11 @@ void NecronamAudioProcessorEditor::paint (juce::Graphics& g)
     auto header = juce::Rectangle<int> (0, 0, w, 84);
     g.setColour (c (COL_HEADER_BG).withAlpha (0.78f));
     g.fillRect (header);
+
+    // Soft shadow cast by the header onto the body below.
+    g.setGradientFill (juce::ColourGradient (juce::Colours::black.withAlpha (0.18f), 0.0f, 84.0f,
+                                             juce::Colours::transparentBlack, 0.0f, 97.0f, false));
+    g.fillRect (0, 84, w, 13);
     HorrorLookAndFeel::drawBloodDrips (g, header.toFloat().removeFromBottom (40.0f));
 
     g.setColour (c (COL_BLOOD_BRIGHT));

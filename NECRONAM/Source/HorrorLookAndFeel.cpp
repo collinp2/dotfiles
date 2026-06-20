@@ -236,6 +236,16 @@ void HorrorLookAndFeel::drawBloodDrips (juce::Graphics& g, juce::Rectangle<float
 
 void HorrorLookAndFeel::drawPanelBackground (juce::Graphics& g, juce::Rectangle<float> bounds)
 {
+    // Soft drop shadow so the panel reads as raised off the parchment. Clipped
+    // to the panel's exterior so the (translucent) interior stays clean.
+    {
+        juce::Graphics::ScopedSaveState save (g);
+        g.excludeClipRegion (bounds.toNearestInt());
+        juce::Path sp;
+        sp.addRoundedRectangle (bounds, 4.0f);
+        juce::DropShadow (juce::Colours::black.withAlpha (0.32f), 13, { 0, 4 }).drawForPath (g, sp);
+    }
+
     // Translucent bone so the parchment texture behind shows through, while the
     // panel still reads brighter/cleaner than the gaps between panels.
     g.setColour (c (COL_PANEL_BG).withAlpha (0.62f));
