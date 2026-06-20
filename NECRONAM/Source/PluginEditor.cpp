@@ -10,6 +10,15 @@ namespace
         return juce::Font (juce::Font::getDefaultMonospacedFontName(), h,
                            bold ? juce::Font::bold : juce::Font::plain);
     }
+
+    // Brutal display face for the logo, loaded from the bundled Anton typeface.
+    juce::Font logoFont (float h)
+    {
+        static const juce::Typeface::Ptr tf =
+            juce::Typeface::createSystemTypefaceFor (BinaryData::AntonRegular_ttf,
+                                                     (size_t) BinaryData::AntonRegular_ttfSize);
+        return juce::Font (tf).withHeight (h);
+    }
 }
 
 // ===========================================================================
@@ -210,43 +219,32 @@ void NecronamAudioProcessorEditor::timerCallback()
 }
 
 // ===========================================================================
-void NecronamAudioProcessorEditor::buildBackground()
-{
-    // Embedded aged-marble texture (shared with the repo preview image).
-    mBackground = juce::ImageCache::getFromMemory (BinaryData::parchment_png,
-                                                   BinaryData::parchment_pngSize);
-}
-
 void NecronamAudioProcessorEditor::paint (juce::Graphics& g)
 {
     const auto w = getWidth();
+    g.fillAll (c (COL_BACKGROUND));
 
-    if (mBackground.isValid())
-        g.drawImage (mBackground, getLocalBounds().toFloat(),
-                     juce::RectanglePlacement::stretchToFit);
-    else
-        g.fillAll (c (COL_BACKGROUND));
-
-    // Header (translucent so the parchment shows through).
+    // Header.
     auto header = juce::Rectangle<int> (0, 0, w, 84);
-    g.setColour (c (COL_HEADER_BG).withAlpha (0.78f));
+    g.setColour (c (COL_HEADER_BG));
     g.fillRect (header);
 
     // Soft shadow cast by the header onto the body below.
     g.setGradientFill (juce::ColourGradient (juce::Colours::black.withAlpha (0.18f), 0.0f, 84.0f,
                                              juce::Colours::transparentBlack, 0.0f, 97.0f, false));
     g.fillRect (0, 84, w, 13);
-    HorrorLookAndFeel::drawBloodDrips (g, header.toFloat().removeFromBottom (40.0f));
+    // Blood drips hang from the very bottom edge of the header (below the text).
+    HorrorLookAndFeel::drawBloodDrips (g, juce::Rectangle<float> (0.0f, 72.0f, (float) w, 14.0f));
 
     g.setColour (c (COL_BLOOD_BRIGHT));
-    g.setFont (juce::Font (juce::Font::getDefaultSansSerifFontName(), 38.0f, juce::Font::bold));
-    g.drawText ("NECRONAM", header.reduced (16, 8).removeFromTop (48),
+    g.setFont (logoFont (40.0f));
+    g.drawText ("NECRONAM", juce::Rectangle<int> (16, 2, w - 200, 46),
                 juce::Justification::centredLeft);
 
     g.setColour (c (COL_BONE_DIM));
     g.setFont (monoFont (11.0f));
     g.drawText ("[ NEURAL AMP NECROMANCY  //  NAM  -  CAB IR  //  API-560 EQ  //  SATURATION ]",
-                header.reduced (18, 8).removeFromBottom (24), juce::Justification::centredLeft);
+                juce::Rectangle<int> (18, 50, w - 36, 16), juce::Justification::centredLeft);
 
     // "A2" badge — lit when a slimmable (Architecture 2) model is loaded.
     {
@@ -262,7 +260,7 @@ void NecronamAudioProcessorEditor::paint (juce::Graphics& g)
         g.setColour (slim ? c (COL_BLOOD_BRIGHT) : c (COL_BONE_DIM).withAlpha (0.5f));
         g.drawRoundedRectangle (badge, 4.0f, 1.4f);
         g.setColour (slim ? c (COL_BONE_LIGHT) : c (COL_BONE_DIM).withAlpha (0.5f));
-        g.setFont (juce::Font (juce::Font::getDefaultSansSerifFontName(), 18.0f, juce::Font::bold));
+        g.setFont (logoFont (18.0f));
         g.drawText ("A2", badge.withTrimmedBottom (9.0f), juce::Justification::centred);
         g.setFont (monoFont (6.5f));
         g.drawText ("ARCHITECTURE", badge.removeFromBottom (10.0f), juce::Justification::centred);
@@ -329,13 +327,14 @@ void NecronamAudioProcessorEditor::paint (juce::Graphics& g)
     g.setFont (monoFont (10.0f));
     g.drawText ("VOIDCRAFT AUDIO  -  NECRONAM v1.0  -  NEURAL AMP NECROMANCY",
                 juce::Rectangle<int> (0, getHeight() - 26, w, 22), juce::Justification::centred);
+
+    // Grain overlay (original VoidCraft texture).
+    HorrorLookAndFeel::drawGrainTexture (g, getLocalBounds());
 }
 
 // ===========================================================================
 void NecronamAudioProcessorEditor::resized()
 {
-    buildBackground();                       // regenerate parchment for new size
-
     auto area = getLocalBounds();
     area.removeFromTop (84);                 // header
     area.removeFromBottom (28);              // footer

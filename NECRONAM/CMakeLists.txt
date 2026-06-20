@@ -80,8 +80,8 @@ juce_add_plugin(NECRONAM
 
 juce_generate_juce_header(NECRONAM)
 
-# Embedded assets (parchment/marble background texture).
-juce_add_binary_data(NecronamAssets SOURCES Resources/parchment.png)
+# Embedded assets (brutal logo typeface).
+juce_add_binary_data(NecronamAssets SOURCES Resources/Anton-Regular.ttf)
 
 target_sources(NECRONAM PRIVATE
     Source/PluginProcessor.cpp

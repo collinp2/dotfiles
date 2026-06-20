@@ -26,7 +26,6 @@ private:
     using ComboAttach  = juce::AudioProcessorValueTreeState::ComboBoxAttachment;
 
     void timerCallback() override;
-    void buildBackground();   // procedural aged-parchment / marble texture
 
     juce::Slider& addKnob (const juce::String& paramID, const juce::String& labelText);
     juce::Slider& addVSlider (const juce::String& paramID, const juce::String& labelText);
@@ -77,8 +76,6 @@ private:
     // Section rectangles (filled in resized(), painted in paint()).
     juce::Rectangle<int> ampArea, cabArea, filterArea, eqArea, satArea, masterArea;
     juce::Rectangle<int> qualityLabelArea;
-
-    juce::Image mBackground;   // cached parchment texture, rebuilt on resize
 
     std::unique_ptr<juce::FileChooser> chooser;
 

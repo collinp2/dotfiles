@@ -246,9 +246,7 @@ void HorrorLookAndFeel::drawPanelBackground (juce::Graphics& g, juce::Rectangle<
         juce::DropShadow (juce::Colours::black.withAlpha (0.32f), 13, { 0, 4 }).drawForPath (g, sp);
     }
 
-    // Translucent bone so the parchment texture behind shows through, while the
-    // panel still reads brighter/cleaner than the gaps between panels.
-    g.setColour (c (COL_PANEL_BG).withAlpha (0.62f));
+    g.setColour (c (COL_PANEL_BG));
     g.fillRoundedRectangle (bounds, 4.0f);
 
     // Vignette - transitioned from black to a deep, bruising red-brown blend
