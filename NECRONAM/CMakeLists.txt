@@ -110,8 +110,10 @@ target_compile_definitions(NECRONAM PRIVATE
 target_include_directories(NECRONAM PRIVATE
     "${NAM_DIR}"
     "${NAM_DEPS}"
+    "${NAM_DEPS}/nlohmann"
     "${ADT_DIR}"
     "${ADT_DIR}/Dependencies"
+    "${ADT_DIR}/Dependencies/nlohmann"
 )
 target_include_directories(NECRONAM SYSTEM PRIVATE
     "${NAM_DEPS}/eigen"
