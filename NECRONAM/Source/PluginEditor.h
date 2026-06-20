@@ -59,6 +59,7 @@ private:
 
     // Direct references for layout.
     juce::Slider* inputKnob = nullptr;
+    juce::Slider* outputKnob = nullptr;
     juce::Slider* gateKnob = nullptr;
     juce::Slider* inputCalKnob = nullptr;
     juce::Slider* hpfKnob = nullptr;

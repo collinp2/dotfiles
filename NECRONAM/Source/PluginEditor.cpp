@@ -69,6 +69,7 @@ NecronamAudioProcessorEditor::NecronamAudioProcessorEditor (NecronamAudioProcess
     // ---- Knobs ----
     inputKnob    = &addKnob (ID::inputLevel,  "INPUT");
     gateKnob     = &addKnob (ID::gateThresh,  "GATE THR");
+    outputKnob   = &addKnob (ID::namOutput,   "OUTPUT");
     inputCalKnob = &addKnob (ID::inputCal,    "IN CAL");
     hpfKnob      = &addKnob (ID::hpfFreq,     "HI-PASS");
     lpfKnob      = &addKnob (ID::lpfFreq,     "LOW-PASS");
@@ -366,9 +367,10 @@ void NecronamAudioProcessorEditor::resized()
 
         a.removeFromTop (18);                 // room for knob labels
         auto knobRow = a.removeFromTop (94);
-        const int kw = knobRow.getWidth() / 3;
+        const int kw = knobRow.getWidth() / 4;
         inputKnob->setBounds    (knobRow.removeFromLeft (kw).reduced (5));
         gateKnob->setBounds     (knobRow.removeFromLeft (kw).reduced (5));
+        outputKnob->setBounds   (knobRow.removeFromLeft (kw).reduced (5));
         inputCalKnob->setBounds (knobRow.reduced (5));
 
         a.removeFromTop (8);

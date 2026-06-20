@@ -77,7 +77,8 @@ public:
     struct ParamID
     {
         static constexpr auto inputLevel   = "input_level";
-        static constexpr auto outputLevel  = "output_level";
+        static constexpr auto namOutput    = "nam_output";     // NAM module output trim
+        static constexpr auto outputLevel  = "output_level";   // master output
         static constexpr auto outputMode   = "output_mode";
         static constexpr auto inputCal     = "input_cal";
         static constexpr auto gateThresh   = "gate_threshold";

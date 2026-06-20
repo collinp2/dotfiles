@@ -21,6 +21,7 @@ input gain
   → noise gate (trigger)
   → NAM model            (resampled to/from the model's native rate)
   → noise gate (gain)
+  → NAM output trim      (module output level, shown on the OUT meter)
   → cab IR               (optional)
   → DC blocker (~5 Hz)
   → API-560 graphic EQ   (optional, 10 octave bands ±12 dB, proportional Q)

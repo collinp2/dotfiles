@@ -70,6 +70,7 @@ APVTS::ParameterLayout NecronamAudioProcessor::createLayout()
 
     // ---- NAM / levels ----
     params.push_back (fParam (ParamID::inputLevel,  "Input Level",  Range (-20.0f, 20.0f, 0.1f), 0.0f, dbToText));
+    params.push_back (fParam (ParamID::namOutput,   "NAM Output",   Range (-40.0f, 40.0f, 0.1f), 0.0f, dbToText));
     params.push_back (fParam (ParamID::outputLevel, "Output Level", Range (-40.0f, 40.0f, 0.1f), 0.0f, dbToText));
     params.push_back (std::make_unique<juce::AudioParameterChoice> (
         juce::ParameterID { ParamID::outputMode, 1 }, "Output Mode",
@@ -269,12 +270,17 @@ void NecronamAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juc
         stage = modelOutPtrs;
     }
 
-    // NAM output meter (model output, or passthrough when no model is loaded).
-    accumulatePeak (mNamPeak, blockPeak (stage[0], numSamples));
-
     // ---- Gate gain ----
     if (gateActive)
         stage = mNoiseGateGain.Process (stage, 1, (size_t) numSamples);
+
+    // ---- NAM module output trim ----
+    const float namOutGain = juce::Decibels::decibelsToGain (
+        apvts.getRawParameterValue (ParamID::namOutput)->load());
+    juce::FloatVectorOperations::multiply (stage[0], namOutGain, numSamples);
+
+    // NAM output meter (post module output trim).
+    accumulatePeak (mNamPeak, blockPeak (stage[0], numSamples));
 
     // ---- Cab IR ----
     const bool irActive = apvts.getRawParameterValue (ParamID::irActive)->load() > 0.5f;
