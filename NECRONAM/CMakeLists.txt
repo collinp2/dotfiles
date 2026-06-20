@@ -27,9 +27,10 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(juce)
 
 # ----------------------------------------------------------------------------
-# NeuralAmpModelerCore  (brings AudioDSPTools + Eigen as submodules,
-# nlohmann/json is vendored in-tree). We compile its sources directly into
-# our target rather than relying on its CMake targets.
+# NeuralAmpModelerCore  (model inference only). Eigen + nlohmann/json are
+# vendored under its Dependencies. We compile its NAM/ sources directly and do
+# NOT use AudioDSPTools (it is entangled with iPlug2 and hardcodes double);
+# the gate, cab IR, DC blocker and resampling are implemented in JUCE instead.
 # ----------------------------------------------------------------------------
 FetchContent_Declare(
     nam_core
@@ -37,24 +38,20 @@ FetchContent_Declare(
     GIT_TAG        main
     GIT_SHALLOW    FALSE
 )
-# We only want the sources, not its CMake project, so Populate (not MakeAvailable).
 FetchContent_GetProperties(nam_core)
 if(NOT nam_core_POPULATED)
     FetchContent_Populate(nam_core)
 endif()
 
-set(NAM_DIR        "${nam_core_SOURCE_DIR}")
-set(NAM_DEPS       "${NAM_DIR}/Dependencies")
-set(ADT_DIR        "${NAM_DEPS}/AudioDSPTools")
+set(NAM_DIR  "${nam_core_SOURCE_DIR}")
+set(NAM_DEPS "${NAM_DIR}/Dependencies")
 
-# Core + AudioDSPTools translation units.
 file(GLOB NAM_CORE_SOURCES "${NAM_DIR}/NAM/*.cpp")
-file(GLOB ADT_SOURCES      "${ADT_DIR}/dsp/*.cpp")
 
 if(NOT NAM_CORE_SOURCES)
     message(FATAL_ERROR
         "NeuralAmpModelerCore sources not found. Run a fresh configure so "
-        "FetchContent can clone the repo and its submodules (Eigen, AudioDSPTools).")
+        "FetchContent can clone the repo and its submodules (Eigen).")
 endif()
 
 # ----------------------------------------------------------------------------
@@ -91,33 +88,25 @@ target_sources(NECRONAM PRIVATE
     Source/PluginEditor.cpp
     Source/HorrorLookAndFeel.cpp
     ${NAM_CORE_SOURCES}
-    ${ADT_SOURCES}
 )
 
-# Make NAM / AudioDSPTools floats so they line up with JUCE's float buffers.
+# NAM core processes float buffers (matches JUCE).
 target_compile_definitions(NECRONAM PRIVATE
     JUCE_WEB_BROWSER=0
     JUCE_USE_CURL=0
     JUCE_VST3_CAN_REPLACE_VST2=0
     JUCE_DISPLAY_SPLASH_SCREEN=0
     NAM_SAMPLE_FLOAT=1
-    DSP_SAMPLE_FLOAT=1
 )
 
-# Include paths for NAM core, AudioDSPTools and their dependencies. We add the
-# common candidate locations so the in-tree includes resolve regardless of how
-# the (possibly nested) submodules get laid out.
+# Include paths for NAM core + its vendored nlohmann/json and Eigen.
 target_include_directories(NECRONAM PRIVATE
     "${NAM_DIR}"
     "${NAM_DEPS}"
     "${NAM_DEPS}/nlohmann"
-    "${ADT_DIR}"
-    "${ADT_DIR}/Dependencies"
-    "${ADT_DIR}/Dependencies/nlohmann"
 )
 target_include_directories(NECRONAM SYSTEM PRIVATE
     "${NAM_DEPS}/eigen"
-    "${ADT_DIR}/Dependencies/eigen"
 )
 
 target_link_libraries(NECRONAM PRIVATE

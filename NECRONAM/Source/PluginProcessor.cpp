@@ -37,9 +37,6 @@ NecronamAudioProcessor::NecronamAudioProcessor()
         .withOutput ("Output", juce::AudioChannelSet::stereo(), true)),
       apvts (*this, nullptr, "PARAMETERS", createLayout())
 {
-    // Gate envelope feeds the post-model gain stage (NAM-style split gate).
-    mNoiseGateTrigger.AddListener (&mNoiseGateGain);
-
     // Watch the A2 quality control so we can apply it off the audio thread.
     apvts.addParameterListener (ParamID::quality, this);
 }
@@ -140,15 +137,14 @@ void NecronamAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlo
     mLPF.prepare (spec);
     mHpfCachedFreq = mLpfCachedFreq = -1.0f;
 
+    mConvolution.prepare (spec);
+    *mDCBlocker.coefficients = *juce::dsp::IIR::Coefficients<float>::makeHighPass (sampleRate, 10.0);
+    mDCBlocker.reset();
+    mGateEnv = 0.0f;
+    mGateGain = 1.0f;
+
     if (mModel != nullptr)
         mModel->Reset (sampleRate, samplesPerBlock);
-
-    // IR was loaded at a possibly different SR; rebuild it at the host SR.
-    if (mIR != nullptr && mIR->GetSampleRate() != sampleRate)
-    {
-        auto data = mIR->GetData();
-        mIR = std::make_unique<dsp::ImpulseResponse> (data, sampleRate);
-    }
 
     mInPeak.store (0.0f);
     mNamPeak.store (0.0f);
@@ -205,7 +201,7 @@ void NecronamAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juc
     const int numIn      = getTotalNumInputChannels();
     const int numOut     = getTotalNumOutputChannels();
 
-    // ---- Hot-swap staged model / IR; honour clear requests ----
+    // ---- Hot-swap staged model; honour clear request ----
     {
         const juce::SpinLock::ScopedTryLockType l (mModelSwapLock);
         if (l.isLocked() && mStagedModel != nullptr)
@@ -213,14 +209,6 @@ void NecronamAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juc
     }
     if (mClearModel.exchange (false))
         mModel.reset();
-
-    {
-        const juce::SpinLock::ScopedTryLockType l (mIRSwapLock);
-        if (l.isLocked() && mStagedIR != nullptr)
-            mIR = std::move (mStagedIR);
-    }
-    if (mClearIR.exchange (false))
-        mIR.reset();
 
     // ---- Sum input to mono ----
     float* mono = mMonoBuffer.getWritePointer (0);
@@ -251,28 +239,34 @@ void NecronamAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juc
     // NAM input meter (post input gain — what the model actually sees).
     accumulatePeak (mInPeak, blockPeak (mono, numSamples));
 
-    DSP_SAMPLE* monoPtrs[1]     = { mono };
-    DSP_SAMPLE* modelOutPtrs[1] = { mModelOutBuffer.getWritePointer (0) };
-    DSP_SAMPLE** stage = monoPtrs;
+    // ---- Noise gate (simple downward gate on the pre-NAM signal) ----
+    if (apvts.getRawParameterValue (ParamID::gateActive)->load() > 0.5f)
+    {
+        const float threshLin = juce::Decibels::decibelsToGain (
+            apvts.getRawParameterValue (ParamID::gateThresh)->load());
+        const float envRel = std::exp (-1.0f / (0.050f * (float) mSampleRate)); // 50 ms
+        const float openC  = std::exp (-1.0f / (0.005f * (float) mSampleRate)); // 5 ms
+        const float closeC = std::exp (-1.0f / (0.100f * (float) mSampleRate)); // 100 ms
+        for (int i = 0; i < numSamples; ++i)
+        {
+            const float a = std::abs (mono[i]);
+            mGateEnv = juce::jmax (a, mGateEnv * envRel);
+            const float target = mGateEnv >= threshLin ? 1.0f : 0.0f;
+            const float c = (target < mGateGain) ? closeC : openC;
+            mGateGain = target + (mGateGain - target) * c;
+            mono[i] *= mGateGain;
+        }
+    }
 
-    // ---- Noise gate (trigger pre-model, gain post-model) ----
-    const bool   gateActive = apvts.getRawParameterValue (ParamID::gateActive)->load() > 0.5f;
-    const double gateThresh = apvts.getRawParameterValue (ParamID::gateThresh)->load();
-    const dsp::noise_gate::TriggerParams tp (0.01, gateThresh, 0.1, 0.005, 0.01, 0.05);
-    mNoiseGateTrigger.SetParams (tp);
-    mNoiseGateTrigger.SetSampleRate (mSampleRate);
-    stage = mNoiseGateTrigger.Process (stage, 1, (size_t) numSamples);
-
-    // ---- NAM model ----
+    // ---- NAM model (resampled to/from its native rate) ----
+    float* monoPtrs[1]     = { mono };
+    float* modelOutPtrs[1] = { mModelOutBuffer.getWritePointer (0) };
+    float** stage = monoPtrs;
     if (mModel != nullptr)
     {
         mModel->process (stage, modelOutPtrs, numSamples);
         stage = modelOutPtrs;
     }
-
-    // ---- Gate gain ----
-    if (gateActive)
-        stage = mNoiseGateGain.Process (stage, 1, (size_t) numSamples);
 
     // ---- NAM module output trim ----
     const float namOutGain = juce::Decibels::decibelsToGain (
@@ -282,19 +276,26 @@ void NecronamAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juc
     // NAM output meter (post module output trim).
     accumulatePeak (mNamPeak, blockPeak (stage[0], numSamples));
 
-    // ---- Cab IR ----
-    const bool irActive = apvts.getRawParameterValue (ParamID::irActive)->load() > 0.5f;
-    if (mIR != nullptr && irActive)
-        stage = mIR->Process (stage, 1, (size_t) numSamples);
-
-    // ---- DC blocker (~5 Hz, always) ----
-    const recursive_linear_filter::HighPassParams dcParams (mSampleRate, 5.0);
-    mDCBlocker.SetParams (dcParams);
-    stage = mDCBlocker.Process (stage, 1, (size_t) numSamples);
-
     // ---- Hand off to the JUCE-domain post chain ----
-    float* work = mono;
+    float* work = mMonoBuffer.getWritePointer (0);
     juce::FloatVectorOperations::copy (work, stage[0], numSamples);
+
+    // ---- Cab IR ----
+    if (mIRLoaded.load() && apvts.getRawParameterValue (ParamID::irActive)->load() > 0.5f)
+    {
+        float* ch[1] = { work };
+        juce::dsp::AudioBlock<float> block (ch, 1, (size_t) numSamples);
+        juce::dsp::ProcessContextReplacing<float> ctx (block);
+        mConvolution.process (ctx);
+    }
+
+    // ---- DC blocker (~10 Hz, always) ----
+    {
+        float* ch[1] = { work };
+        juce::dsp::AudioBlock<float> block (ch, 1, (size_t) numSamples);
+        juce::dsp::ProcessContextReplacing<float> ctx (block);
+        mDCBlocker.process (ctx);
+    }
 
     // EQ
     if (apvts.getRawParameterValue (ParamID::eqActive)->load() > 0.5f)
@@ -430,31 +431,23 @@ void NecronamAudioProcessor::applyQuality()
 
 void NecronamAudioProcessor::loadImpulseResponse (const juce::File& file)
 {
-    const double sr = mPrepared.load() ? mSampleRate : 48000.0;
-    auto ir = std::make_unique<dsp::ImpulseResponse> (
-        std::filesystem::u8path (file.getFullPathName().toStdString()).string().c_str(), sr);
-
-    if (ir->GetWavState() != dsp::wav::LoadReturnCode::SUCCESS)
-    {
-        juce::Logger::writeToLog ("NECRONAM: failed to load IR: " + file.getFullPathName());
+    if (! file.existsAsFile())
         return;
-    }
 
-    {
-        const juce::SpinLock::ScopedLockType l (mIRSwapLock);
-        mStagedIR = std::move (ir);
-    }
+    // juce::dsp::Convolution loads on its own background thread and swaps the IR
+    // in atomically; it resamples the IR to the current spec automatically.
+    mConvolution.loadImpulseResponse (file,
+                                      juce::dsp::Convolution::Stereo::no,
+                                      juce::dsp::Convolution::Trim::no,
+                                      0);
+    mIRLoaded.store (true);
     mIRName = file.getFileNameWithoutExtension();
     apvts.state.setProperty ("irPath", file.getFullPathName(), nullptr);
 }
 
 void NecronamAudioProcessor::clearImpulseResponse()
 {
-    mClearIR.store (true);
-    {
-        const juce::SpinLock::ScopedLockType l (mIRSwapLock);
-        mStagedIR.reset();
-    }
+    mIRLoaded.store (false);   // bypass; the convolver simply isn't run
     mIRName = {};
     apvts.state.setProperty ("irPath", "", nullptr);
 }

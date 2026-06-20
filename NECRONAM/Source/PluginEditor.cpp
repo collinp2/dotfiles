@@ -248,7 +248,7 @@ void NecronamAudioProcessorEditor::paint (juce::Graphics& g)
     // "A2" badge — lit when a slimmable (Architecture 2) model is loaded.
     {
         const bool slim = processor.isModelSlimmable();
-        const auto badge = juce::Rectangle<float> (w - 78.0f, 16.0f, 60.0f, 32.0f);
+        auto badge = juce::Rectangle<float> (w - 78.0f, 16.0f, 60.0f, 32.0f);
         g.setColour (slim ? c (COL_BLOOD_DARK) : c (COL_PANEL_BG));
         g.fillRoundedRectangle (badge, 4.0f);
         if (slim)   // outer glow

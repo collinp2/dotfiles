@@ -10,17 +10,13 @@
 #include "Api560EQ.h"
 #include "Saturation.h"
 
-// AudioDSPTools blocks reused straight from the NAM ecosystem.
-#include "dsp/NoiseGate.h"
-#include "dsp/ImpulseResponse.h"
-#include "dsp/RecursiveLinearFilter.h"
-#include "dsp/wav.h"
-
 // ============================================================================
 //  NECRONAM  —  AudioProcessor
 //  Signal chain:
-//    input gain -> noise gate -> NAM model -> gate gain -> cab IR
+//    input gain -> noise gate -> NAM model -> NAM output -> cab IR
 //    -> DC blocker -> API-560 EQ -> saturation -> HPF -> LPF -> output
+//  Utility DSP (gate, IR, DC) is implemented in JUCE; only the model comes
+//  from NeuralAmpModelerCore.
 // ============================================================================
 class NecronamAudioProcessor : public juce::AudioProcessor,
                                private juce::AudioProcessorValueTreeState::Listener,
@@ -121,23 +117,23 @@ private:
     std::atomic<bool>              mClearModel { false };
     std::atomic<bool>              mModelSlimmable { false };
 
-    // ----- Cab IR ------------------------------------------------------------
-    std::unique_ptr<dsp::ImpulseResponse> mIR;
-    std::unique_ptr<dsp::ImpulseResponse> mStagedIR;
-    juce::SpinLock                        mIRSwapLock;
-    juce::String                          mIRName;
-    std::atomic<bool>                     mClearIR { false };
+    // ----- Cab IR (juce::dsp::Convolution loads/swaps on its own thread) ------
+    juce::dsp::Convolution mConvolution;
+    juce::String           mIRName;
+    std::atomic<bool>      mIRLoaded { false };
 
-    // ----- Fixed DSP blocks --------------------------------------------------
-    dsp::noise_gate::Trigger          mNoiseGateTrigger;
-    dsp::noise_gate::Gain             mNoiseGateGain;
-    recursive_linear_filter::HighPass mDCBlocker;          // ~5 Hz, always on
-    Api560EQ                          mEQ;
-    Saturation                        mSaturation;
-    juce::dsp::IIR::Filter<float>     mHPF;                 // user hi-pass
-    juce::dsp::IIR::Filter<float>     mLPF;                 // user low-pass
+    // ----- Fixed DSP blocks (JUCE) ------------------------------------------
+    Api560EQ                      mEQ;
+    Saturation                    mSaturation;
+    juce::dsp::IIR::Filter<float> mDCBlocker;          // ~10 Hz, always on
+    juce::dsp::IIR::Filter<float> mHPF;                // user hi-pass
+    juce::dsp::IIR::Filter<float> mLPF;                // user low-pass
     float mHpfCachedFreq = -1.0f;
     float mLpfCachedFreq = -1.0f;
+
+    // ----- Noise gate (simple downward gate on the pre-NAM signal) ----------
+    float mGateEnv  = 0.0f;
+    float mGateGain = 1.0f;
 
     // ----- Scratch buffers ---------------------------------------------------
     juce::AudioBuffer<float> mMonoBuffer;     // summed mono working buffer
