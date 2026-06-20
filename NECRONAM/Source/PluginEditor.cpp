@@ -185,6 +185,7 @@ void NecronamAudioProcessorEditor::timerCallback()
         qualitySlider.setEnabled (slim);
         qualitySlider.setAlpha (slim ? 1.0f : 0.45f);
         repaint (qualityLabelArea);
+        repaint (getWidth() - 90, 0, 90, 84);   // the A2 header badge
     }
 }
 
@@ -209,6 +210,26 @@ void NecronamAudioProcessorEditor::paint (juce::Graphics& g)
     g.setFont (monoFont (11.0f));
     g.drawText ("[ NEURAL AMP NECROMANCY  //  NAM  -  CAB IR  //  API-560 EQ  //  SATURATION ]",
                 header.reduced (18, 8).removeFromBottom (24), juce::Justification::centredLeft);
+
+    // "A2" badge — lit when a slimmable (Architecture 2) model is loaded.
+    {
+        const bool slim = processor.isModelSlimmable();
+        const auto badge = juce::Rectangle<float> (w - 78.0f, 16.0f, 60.0f, 32.0f);
+        g.setColour (slim ? c (COL_BLOOD_DARK) : c (COL_PANEL_BG));
+        g.fillRoundedRectangle (badge, 4.0f);
+        if (slim)   // outer glow
+        {
+            g.setColour (c (COL_BLOOD_BRIGHT).withAlpha (0.25f));
+            g.drawRoundedRectangle (badge.expanded (2.0f), 5.0f, 2.0f);
+        }
+        g.setColour (slim ? c (COL_BLOOD_BRIGHT) : c (COL_BONE_DIM).withAlpha (0.5f));
+        g.drawRoundedRectangle (badge, 4.0f, 1.4f);
+        g.setColour (slim ? c (COL_BONE) : c (COL_BONE_DIM).withAlpha (0.5f));
+        g.setFont (juce::Font (juce::Font::getDefaultSansSerifFontName(), 18.0f, juce::Font::bold));
+        g.drawText ("A2", badge.withTrimmedBottom (9.0f), juce::Justification::centred);
+        g.setFont (monoFont (6.5f));
+        g.drawText ("ARCHITECTURE", badge.removeFromBottom (10.0f), juce::Justification::centred);
+    }
 
     auto sectionTitle = [&] (juce::Rectangle<int> area, const juce::String& t)
     {
