@@ -7,8 +7,7 @@ namespace
 {
     juce::Font monoFont (float h, bool bold = true)
     {
-        return juce::Font (juce::Font::getDefaultMonospacedFontName(), h,
-                           bold ? juce::Font::bold : juce::Font::plain);
+        return HorrorLookAndFeel::monoFont (h, bold);   // bundled IBM Plex Mono
     }
 
     // Brutal display face for the logo, loaded from the bundled Anton typeface.

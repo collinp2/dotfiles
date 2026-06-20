@@ -72,7 +72,7 @@ public:
         if (! caption.isEmpty())
         {
             g.setColour (c (COL_BONE_DIM));
-            g.setFont (juce::Font (juce::Font::getDefaultMonospacedFontName(), 9.0f, juce::Font::bold));
+            g.setFont (HorrorLookAndFeel::monoFont (9.0f, true));
             g.drawText (caption, capArea, juce::Justification::centred);
         }
     }

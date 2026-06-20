@@ -55,4 +55,7 @@ public:
     static void drawGrainTexture (juce::Graphics&, juce::Rectangle<int> area, float alpha = 0.04f);
     static void drawBloodDrips   (juce::Graphics&, juce::Rectangle<float> area);
     static void drawPanelBackground (juce::Graphics&, juce::Rectangle<float> bounds);
+
+    // Bundled body typeface (IBM Plex Mono), shared by the editor and L&F.
+    static juce::Font monoFont (float height, bool bold = true);
 };

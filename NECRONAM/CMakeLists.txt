@@ -80,8 +80,11 @@ juce_add_plugin(NECRONAM
 
 juce_generate_juce_header(NECRONAM)
 
-# Embedded assets (brutal logo typeface).
-juce_add_binary_data(NecronamAssets SOURCES Resources/Anton-Regular.ttf)
+# Embedded assets (logo + body typefaces).
+juce_add_binary_data(NecronamAssets SOURCES
+    Resources/Anton-Regular.ttf
+    Resources/IBMPlexMono-Regular.ttf
+    Resources/IBMPlexMono-Bold.ttf)
 
 target_sources(NECRONAM PRIVATE
     Source/PluginProcessor.cpp

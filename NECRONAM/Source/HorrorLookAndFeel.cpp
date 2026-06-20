@@ -1,9 +1,34 @@
 #include "HorrorLookAndFeel.h"
+#include "BinaryData.h"
 
 using namespace horror;
 
+namespace
+{
+    juce::Typeface::Ptr plexRegular()
+    {
+        static const juce::Typeface::Ptr t = juce::Typeface::createSystemTypefaceFor (
+            BinaryData::IBMPlexMonoRegular_ttf, (size_t) BinaryData::IBMPlexMonoRegular_ttfSize);
+        return t;
+    }
+    juce::Typeface::Ptr plexBold()
+    {
+        static const juce::Typeface::Ptr t = juce::Typeface::createSystemTypefaceFor (
+            BinaryData::IBMPlexMonoBold_ttf, (size_t) BinaryData::IBMPlexMonoBold_ttfSize);
+        return t;
+    }
+}
+
+juce::Font HorrorLookAndFeel::monoFont (float height, bool bold)
+{
+    return juce::Font (bold ? plexBold() : plexRegular()).withHeight (height);
+}
+
 HorrorLookAndFeel::HorrorLookAndFeel()
 {
+    // Font-lock all default-drawn text (textboxes, combo, popups) to Plex Mono.
+    setDefaultSansSerifTypeface (plexRegular());
+
     setColour (juce::Slider::textBoxTextColourId,      c (COL_BONE));
     setColour (juce::Slider::textBoxOutlineColourId,   juce::Colours::transparentBlack);
     setColour (juce::Label::textColourId,              c (COL_BONE));
@@ -157,7 +182,7 @@ void HorrorLookAndFeel::drawLinearSlider (juce::Graphics& g, int x, int y, int w
 // ---------------------------------------------------------------------------
 juce::Font HorrorLookAndFeel::getLabelFont (juce::Label&)
 {
-    return juce::Font (juce::Font::getDefaultMonospacedFontName(), 10.5f, juce::Font::bold);
+    return monoFont (10.5f, true);
 }
 
 void HorrorLookAndFeel::drawLabel (juce::Graphics& g, juce::Label& label)
@@ -187,8 +212,8 @@ void HorrorLookAndFeel::drawButtonBackground (juce::Graphics& g, juce::Button& b
 
 void HorrorLookAndFeel::drawButtonText (juce::Graphics& g, juce::TextButton& b, bool, bool)
 {
-    g.setColour (b.getToggleState() ? c (COL_BLOOD_BRIGHT) : c (COL_BONE));
-    g.setFont (juce::Font (juce::Font::getDefaultMonospacedFontName(), 11.0f, juce::Font::bold));
+    g.setColour (b.getToggleState() ? c (COL_BONE_LIGHT) : c (COL_BONE));
+    g.setFont (monoFont (11.0f, true));
     g.drawFittedText (b.getButtonText().toUpperCase(), b.getLocalBounds(), juce::Justification::centred, 1, 0.85f);
 }
 
