@@ -196,13 +196,16 @@ void HorrorLookAndFeel::drawButtonText (juce::Graphics& g, juce::TextButton& b, 
 void HorrorLookAndFeel::drawGrainTexture (juce::Graphics& g, juce::Rectangle<int> area, float alpha)
 {
     juce::Random rng (0xDEADBEEF);
-    for (int i = 0; i < area.getWidth() * area.getHeight() / 8; ++i)
+    // Spatters dark dried blood flecks over the light bone surface instead of white dust
+    for (int i = 0; i < area.getWidth() * area.getHeight() / 12; ++i)
     {
         const int px = area.getX() + rng.nextInt (juce::jmax (1, area.getWidth()));
         const int py = area.getY() + rng.nextInt (juce::jmax (1, area.getHeight()));
-        const float a = juce::jmap (rng.nextFloat(), 0.0f, 1.0f, 0.0f, alpha * 5.0f);
-        g.setColour (juce::Colours::white.withAlpha (a));
-        g.fillRect (px, py, 1, 1);
+        const float a = juce::jmap (rng.nextFloat(), 0.0f, 1.0f, 0.0f, alpha * 4.0f);
+
+        // Randomly alternate between dark dried clots and raw red spots
+        g.setColour (rng.nextBool() ? c (COL_BLOOD_DARK).withAlpha (a) : c (COL_BLOOD).withAlpha (a * 0.5f));
+        g.fillRect (px, py, rng.nextInt (2) + 1, rng.nextInt (2) + 1);
     }
 }
 
@@ -236,24 +239,24 @@ void HorrorLookAndFeel::drawPanelBackground (juce::Graphics& g, juce::Rectangle<
     g.setColour (c (COL_PANEL_BG));
     g.fillRoundedRectangle (bounds, 4.0f);
 
-    // Vignette.
+    // Vignette - transitioned from black to a deep, bruising red-brown blend
     juce::ColourGradient vig (juce::Colours::transparentBlack, bounds.getCentre(),
-                              juce::Colours::black.withAlpha (0.35f), bounds.getTopLeft(), true);
+                              c (COL_RUST).withAlpha (0.25f), bounds.getTopLeft(), true);
     g.setGradientFill (vig);
     g.fillRoundedRectangle (bounds, 4.0f);
 
-    // Faint scratches.
+    // Deep flesh scratches (Dark instead of white so they tear into the bone plate)
     juce::Random rng ((int) (bounds.getX() * 7.0f + bounds.getY() * 13.0f) + 99);
-    g.setColour (juce::Colours::white.withAlpha (0.04f));
-    for (int i = 0; i < 5; ++i)
+    g.setColour (c (COL_BLOOD_DARK).withAlpha (0.15f));
+    for (int i = 0; i < 7; ++i)
     {
         const float yy = bounds.getY() + rng.nextFloat() * bounds.getHeight();
-        g.drawLine (bounds.getX() + 4.0f, yy, bounds.getRight() - 4.0f, yy + rng.nextFloat() * 4.0f - 2.0f, 0.6f);
+        g.drawLine (bounds.getX() + 4.0f, yy, bounds.getRight() - 4.0f, yy + rng.nextFloat() * 6.0f - 3.0f, 0.8f);
     }
 
-    // Border + top/left highlight edge.
+    // Outer framing tissue boundaries
     g.setColour (c (COL_PANEL_BORDER));
     g.drawRoundedRectangle (bounds, 4.0f, 1.2f);
-    g.setColour (c (0xFF3A0000));
+    g.setColour (c (COL_BLOOD_DARK).withAlpha (0.4f));
     g.drawLine (bounds.getX() + 2.0f, bounds.getY() + 2.0f, bounds.getRight() - 2.0f, bounds.getY() + 2.0f, 0.8f);
 }

@@ -243,7 +243,7 @@ void NecronamAudioProcessorEditor::paint (juce::Graphics& g)
         }
         g.setColour (slim ? c (COL_BLOOD_BRIGHT) : c (COL_BONE_DIM).withAlpha (0.5f));
         g.drawRoundedRectangle (badge, 4.0f, 1.4f);
-        g.setColour (slim ? c (COL_BONE) : c (COL_BONE_DIM).withAlpha (0.5f));
+        g.setColour (slim ? c (COL_BONE_LIGHT) : c (COL_BONE_DIM).withAlpha (0.5f));
         g.setFont (juce::Font (juce::Font::getDefaultSansSerifFontName(), 18.0f, juce::Font::bold));
         g.drawText ("A2", badge.withTrimmedBottom (9.0f), juce::Justification::centred);
         g.setFont (monoFont (6.5f));
