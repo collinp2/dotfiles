@@ -179,8 +179,15 @@ void NecronamAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlo
     mGateEnv = 0.0f;
     mGateGain = 1.0f;
 
-    if (mModel != nullptr)
-        mModel->Reset (sampleRate, samplesPerBlock);
+    // Reset the active AND staged models. The staged one matters: when a model
+    // is restored from state (setStateInformation) before prepareToPlay, it was
+    // staged without a Reset; it must be sized here before it can be swapped in
+    // and processed, or WaveNet writes out of bounds.
+    {
+        const juce::SpinLock::ScopedLockType l (mModelSwapLock);
+        if (mModel != nullptr)       mModel->Reset (sampleRate, samplesPerBlock);
+        if (mStagedModel != nullptr) mStagedModel->Reset (sampleRate, samplesPerBlock);
+    }
 
     mInPeak.store (0.0f);
     mNamPeak.store (0.0f);
