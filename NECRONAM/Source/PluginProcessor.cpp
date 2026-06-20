@@ -9,6 +9,19 @@ using APVTS = juce::AudioProcessorValueTreeState;
 
 namespace
 {
+    float blockPeak (const float* x, int n)
+    {
+        float m = 0.0f;
+        for (int i = 0; i < n; ++i) m = juce::jmax (m, std::abs (x[i]));
+        return m;
+    }
+
+    void accumulatePeak (std::atomic<float>& dst, float v)
+    {
+        float cur = dst.load (std::memory_order_relaxed);
+        while (v > cur && ! dst.compare_exchange_weak (cur, v, std::memory_order_relaxed)) {}
+    }
+
     juce::String dbToText (float v, int)  { return juce::String (v, 1) + " dB"; }
     juce::String hzToText (float v, int)
     {
@@ -136,6 +149,10 @@ void NecronamAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlo
         mIR = std::make_unique<dsp::ImpulseResponse> (data, sampleRate);
     }
 
+    mInPeak.store (0.0f);
+    mNamPeak.store (0.0f);
+    mMasterPeak.store (0.0f);
+
     mPrepared.store (true);
     updateLatency();
 }
@@ -230,6 +247,9 @@ void NecronamAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juc
         inputGainDb += inputCal - (float) mModel->GetInputLevel();
     juce::FloatVectorOperations::multiply (mono, juce::Decibels::decibelsToGain (inputGainDb), numSamples);
 
+    // NAM input meter (post input gain — what the model actually sees).
+    accumulatePeak (mInPeak, blockPeak (mono, numSamples));
+
     DSP_SAMPLE* monoPtrs[1]     = { mono };
     DSP_SAMPLE* modelOutPtrs[1] = { mModelOutBuffer.getWritePointer (0) };
     DSP_SAMPLE** stage = monoPtrs;
@@ -248,6 +268,9 @@ void NecronamAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juc
         mModel->process (stage, modelOutPtrs, numSamples);
         stage = modelOutPtrs;
     }
+
+    // NAM output meter (model output, or passthrough when no model is loaded).
+    accumulatePeak (mNamPeak, blockPeak (stage[0], numSamples));
 
     // ---- Gate gain ----
     if (gateActive)
@@ -322,6 +345,9 @@ void NecronamAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juc
 
     // ---- Output gain / mode ----
     juce::FloatVectorOperations::multiply (work, computeOutputGain(), numSamples);
+
+    // Master output meter (whole-plugin output).
+    accumulatePeak (mMasterPeak, blockPeak (work, numSamples));
 
     // ---- Fan the mono result out to every output channel ----
     for (int ch = 0; ch < numOut; ++ch)

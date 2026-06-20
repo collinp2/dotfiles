@@ -8,6 +8,7 @@
 
 #include "PluginProcessor.h"
 #include "HorrorLookAndFeel.h"
+#include "LevelMeter.h"
 
 class NecronamAudioProcessorEditor : public juce::AudioProcessorEditor,
                                      private juce::Timer
@@ -45,6 +46,10 @@ private:
     // A2 quality / efficiency slider.
     juce::Slider qualitySlider;
 
+    // Master output level fader + level meters.
+    juce::Slider masterFader;
+    LevelMeter   inMeter, namOutMeter, masterMeter;
+
     // Owned widgets (knobs / sliders / toggles) and their labels + attachments.
     std::vector<std::unique_ptr<juce::Slider>>     sliders;
     std::vector<std::unique_ptr<juce::Label>>      labels;
@@ -54,7 +59,6 @@ private:
 
     // Direct references for layout.
     juce::Slider* inputKnob = nullptr;
-    juce::Slider* outputKnob = nullptr;
     juce::Slider* gateKnob = nullptr;
     juce::Slider* inputCalKnob = nullptr;
     juce::Slider* hpfKnob = nullptr;
@@ -69,7 +73,7 @@ private:
     std::array<juce::Slider*, 9> satKnobs {};
 
     // Section rectangles (filled in resized(), painted in paint()).
-    juce::Rectangle<int> ampArea, cabArea, filterArea, eqArea, satArea;
+    juce::Rectangle<int> ampArea, cabArea, filterArea, eqArea, satArea, masterArea;
     juce::Rectangle<int> qualityLabelArea;
 
     std::unique_ptr<juce::FileChooser> chooser;

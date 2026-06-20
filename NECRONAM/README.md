@@ -33,6 +33,19 @@ input gain
 The amp path is mono (NAM and cab IRs are mono); the processed signal is fanned
 out to all output channels.
 
+## Metering
+
+Three peak meters (peak-hold, ~30 Hz):
+
+- **IN** / **OUT** in the Amp panel — the NAM module's input (post input gain,
+  i.e. what the model sees — useful since NAM models are level-sensitive) and
+  output.
+- **MASTER** in the right-hand output strip — the whole-plugin output, next to
+  the master level fader and output-mode selector.
+
+Peaks are accumulated on the audio thread (lock-free) and read+reset by the
+editor; the over-0 dBFS portion of each bar lights up as a clip warning.
+
 ## Low latency
 
 Latency is **zero** whenever the loaded model's native sample rate matches the

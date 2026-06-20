@@ -66,6 +66,11 @@ public:
     // the Quality control (older A1 models always return false).
     bool isModelSlimmable() const { return mModelSlimmable.load(); }
 
+    // Meter taps (peak since last read, linear). Read+reset from the editor.
+    float fetchInputPeak()  { return mInPeak.exchange (0.0f); }
+    float fetchNamPeak()    { return mNamPeak.exchange (0.0f); }
+    float fetchMasterPeak() { return mMasterPeak.exchange (0.0f); }
+
     juce::AudioProcessorValueTreeState apvts;
 
     // Parameter IDs (single source of truth, shared with the editor).
@@ -136,6 +141,11 @@ private:
     // ----- Scratch buffers ---------------------------------------------------
     juce::AudioBuffer<float> mMonoBuffer;     // summed mono working buffer
     juce::AudioBuffer<float> mModelOutBuffer; // NAM model output
+
+    // Meter accumulators (peak, linear), reset when the editor reads them.
+    std::atomic<float> mInPeak     { 0.0f };
+    std::atomic<float> mNamPeak    { 0.0f };
+    std::atomic<float> mMasterPeak { 0.0f };
 
     double mSampleRate = 44100.0;
     int    mMaxBlock   = 512;

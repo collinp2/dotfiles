@@ -49,12 +49,26 @@ NecronamAudioProcessorEditor::NecronamAudioProcessorEditor (NecronamAudioProcess
     sliderAttachments.push_back (std::make_unique<SliderAttach> (
         processor.apvts, NecronamAudioProcessor::ParamID::quality, qualitySlider));
 
+    // Master output level fader (whole-plugin output).
+    masterFader.setSliderStyle (juce::Slider::LinearVertical);
+    masterFader.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 60, 15);
+    masterFader.setColour (juce::Slider::textBoxTextColourId, c (COL_BONE));
+    addAndMakeVisible (masterFader);
+    sliderAttachments.push_back (std::make_unique<SliderAttach> (
+        processor.apvts, NecronamAudioProcessor::ParamID::outputLevel, masterFader));
+
+    // Level meters.
+    inMeter.caption     = "IN";
+    namOutMeter.caption = "OUT";
+    masterMeter.caption = "OUT";
+    for (auto* m : { &inMeter, &namOutMeter, &masterMeter })
+        addAndMakeVisible (*m);
+
     using ID = NecronamAudioProcessor::ParamID;
 
     // ---- Knobs ----
     inputKnob    = &addKnob (ID::inputLevel,  "INPUT");
     gateKnob     = &addKnob (ID::gateThresh,  "GATE THR");
-    outputKnob   = &addKnob (ID::outputLevel, "OUTPUT");
     inputCalKnob = &addKnob (ID::inputCal,    "IN CAL");
     hpfKnob      = &addKnob (ID::hpfFreq,     "HI-PASS");
     lpfKnob      = &addKnob (ID::lpfFreq,     "LOW-PASS");
@@ -85,7 +99,7 @@ NecronamAudioProcessorEditor::NecronamAudioProcessorEditor (NecronamAudioProcess
             satKnobs[(size_t) (b * 3 + s)] =
                 &addKnob (juce::String (bandIds[b]) + "_" + stageIds[s], stageNm[s]);
 
-    startTimerHz (5);
+    startTimerHz (30);
     setSize (1000, 800);
 }
 
@@ -173,6 +187,10 @@ void NecronamAudioProcessorEditor::chooseFile (bool isModel)
 
 void NecronamAudioProcessorEditor::timerCallback()
 {
+    inMeter.update     (processor.fetchInputPeak());
+    namOutMeter.update (processor.fetchNamPeak());
+    masterMeter.update (processor.fetchMasterPeak());
+
     const auto m = processor.getLoadedModelName();
     modelNameLabel.setText (m.isEmpty() ? "(no model)" : m, juce::dontSendNotification);
     const auto ir = processor.getLoadedIRName();
@@ -239,7 +257,7 @@ void NecronamAudioProcessorEditor::paint (juce::Graphics& g)
     };
 
     // Panels.
-    for (auto* r : { &ampArea, &cabArea, &filterArea, &eqArea, &satArea })
+    for (auto* r : { &ampArea, &cabArea, &filterArea, &eqArea, &satArea, &masterArea })
         HorrorLookAndFeel::drawPanelBackground (g, r->toFloat());
 
     sectionTitle (ampArea,    "AMP / MODEL");
@@ -247,6 +265,18 @@ void NecronamAudioProcessorEditor::paint (juce::Graphics& g)
     sectionTitle (filterArea, "FILTERS");
     sectionTitle (eqArea,     "GRAPHIC EQ  -  API 560 STYLE");
     sectionTitle (satArea,    "SATURATION  -  FLESH RENDER");
+    sectionTitle (masterArea, "MASTER");
+
+    // Master strip: "OUTPUT MODE" caption above the mode selector.
+    if (! masterArea.isEmpty())
+    {
+        g.setColour (c (COL_BONE_DIM));
+        g.setFont (monoFont (8.5f));
+        auto lbl = juce::Rectangle<int> (masterArea.getX() + 10,
+                                         masterArea.getBottom() - 10 - 24 - 13,
+                                         masterArea.getWidth() - 20, 12);
+        g.drawText ("OUTPUT MODE", lbl, juce::Justification::centred);
+    }
 
     // Saturation band labels.
     if (! satArea.isEmpty())
@@ -293,6 +323,10 @@ void NecronamAudioProcessorEditor::resized()
     area.removeFromBottom (28);              // footer
     area.reduce (12, 8);
 
+    // ---- Master output strip (full height, far right) ----
+    masterArea = area.removeFromRight (112);
+    area.removeFromRight (10);
+
     // ---- Row 1: AMP | (CAB over FILTERS) ----
     auto row1 = area.removeFromTop (268);
     ampArea = row1.removeFromLeft (380);
@@ -322,23 +356,44 @@ void NecronamAudioProcessorEditor::resized()
         loadRow.removeFromRight (6);
         modelNameLabel.setBounds (loadRow);
 
+        // Reserve a right strip (below the load row) for the NAM IN/OUT meters.
+        auto meterStrip = a.removeFromRight (56);
+        a.removeFromRight (12);
+        meterStrip.removeFromTop (4);
+        inMeter.setBounds     (meterStrip.removeFromLeft (26));
+        meterStrip.removeFromLeft (4);
+        namOutMeter.setBounds (meterStrip);
+
         a.removeFromTop (18);                 // room for knob labels
         auto knobRow = a.removeFromTop (94);
-        const int kw = knobRow.getWidth() / 4;
+        const int kw = knobRow.getWidth() / 3;
         inputKnob->setBounds    (knobRow.removeFromLeft (kw).reduced (5));
         gateKnob->setBounds     (knobRow.removeFromLeft (kw).reduced (5));
-        outputKnob->setBounds   (knobRow.removeFromLeft (kw).reduced (5));
         inputCalKnob->setBounds (knobRow.reduced (5));
 
         a.removeFromTop (8);
         auto modeRow = a.removeFromTop (26);
-        outputModeBox.setBounds (modeRow.removeFromLeft (160));
-        modeRow.removeFromLeft (10);
-        gateToggle->setBounds (modeRow.removeFromLeft (74));
+        gateToggle->setBounds (modeRow.removeFromLeft (90));
 
         a.removeFromTop (8);
         qualityLabelArea = a.removeFromTop (14);          // painted hints
         qualitySlider.setBounds (a.removeFromTop (26));
+    }
+
+    // ===== MASTER contents =====
+    {
+        auto m = masterArea.reduced (10);
+        m.removeFromTop (20);                              // section title (painted)
+
+        auto modeBox = m.removeFromBottom (24);
+        outputModeBox.setBounds (modeBox);
+        m.removeFromBottom (14);                           // "MODE" label (painted)
+        m.removeFromBottom (8);
+
+        // Meter on the left, master level fader on the right.
+        masterMeter.setBounds (m.removeFromLeft (28));
+        m.removeFromLeft (8);
+        masterFader.setBounds (m);
     }
 
     // ===== CAB contents =====
